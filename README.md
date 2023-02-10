@@ -7,6 +7,7 @@ At present (February, 2023) this is a partial implementation of the [OME-NGFF sp
 
 ## How it works
 OME-NGFF metadata is represented as [pydantic](https://docs.pydantic.dev/) models. 
+[`Axes`](https://ngff.openmicroscopy.org/latest/#axes-md) metadata is inferred from a DataArray by iterating over the dimensions of the array and checking for `units` and `type` properties in the attributes of the `coords` assigned to each dimension. Dimensions without coordinates will raise an exception. Scale and translation `CoordinateTransforms` are inferred by inspecting the values of the coordinates for each dimension. Be advised that no attempt is made to verify that arrays are sampled on a regular grid.
 
 ## Usage
 
