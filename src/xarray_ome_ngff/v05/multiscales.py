@@ -63,22 +63,26 @@ TimeUnit = Literal[
     "zettasecond",
 ]
 
-AxisType = Literal["space", "time", "channel"]
+AxisType = Literal[
+    "space", "time", "channel"
+]  # axis types should probably be "dimensional" vs "categorical" instead
 
 
-class PathTransform(StrictBaseModel):
+class PathTransform(
+    StrictBaseModel
+):  # the existence of this type is a massive sinkhole in the spec
     type: Union[Literal["scale"], Literal["translation"]]
     path: str
 
 
 class VectorTranslationTransform(StrictBaseModel):
     type: Literal["translation"] = "translation"
-    translation: List[float]
+    translation: List[float]  # redundant field name -- we already know it's translation
 
 
 class VectorScaleTransform(StrictBaseModel):
     type: Literal["scale"] = "scale"
-    scale: List[float]
+    scale: List[float]  # redundant field name -- we already know it's scale
 
 
 ScaleTransform = Union[VectorScaleTransform, PathTransform]
@@ -88,7 +92,7 @@ CoordinateTransform = List[Union[ScaleTransform, TranslationTransform]]
 
 class Axis(StrictBaseModel):
     name: str
-    type: Optional[Union[AxisType, str]]
+    type: Optional[Union[AxisType, str]]  # unit defines type, so this is not needed
     unit: Optional[Union[TimeUnit, SpaceUnit, str]]
 
 
@@ -100,15 +104,21 @@ class MultiscaleDataset(BaseModel):
 
 
 class MultiscaleMetadata(BaseModel):
-    version: Optional[str] = OmeNgffVersion
-    name: Optional[str]
-    type: Optional[str]
-    metadata: Optional[Dict[str, Any]] = None
-    axes: List[Axis]
+    version: Optional[str] = OmeNgffVersion  # why is this optional?
+    name: Optional[str]  # why is this nullable instead of reserving the empty string
+    type: Optional[
+        str
+    ]  # not clear what this field is for, given the existence of .metadata
+    metadata: Optional[
+        Dict[str, Any]
+    ] = None  # should default to empty dict instead of None
+    axes: List[
+        Axis
+    ]  # should not exist at top level and instead live in dataset metadata or in .datasets
     datasets: List[MultiscaleDataset]
     coordinateTransformations: Optional[
         List[Union[ScaleTransform, TranslationTransform]]
-    ]
+    ]  # should not live here, and if it is here, it should default to an empty list instead of being nullable
 
     @classmethod
     def fromDataArrays(
