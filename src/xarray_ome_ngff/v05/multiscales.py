@@ -110,21 +110,21 @@ class MultiscaleDataset(BaseModel):
 
 
 class MultiscaleMetadata(BaseModel):
-    version: Optional[str] = OmeNgffVersion  # why is this optional?
-    name: Optional[str]  # why is this nullable instead of reserving the empty string
-    type: Optional[
-        str
-    ]  # not clear what this field is for, given the existence of .metadata
-    metadata: Optional[
-        Dict[str, Any]
-    ] = None  # should default to empty dict instead of None
-    axes: List[
-        Axis
-    ]  # should not exist at top level and instead live in dataset metadata or in .datasets
+    # why is this optional?
+    version: Optional[str] = OmeNgffVersion
+    # why is this nullable instead of reserving the empty string
+    name: Optional[str]
+    # not clear what this field is for, given the existence of .metadata
+    type: Optional[str]
+    # should default to empty dict instead of None
+    metadata: Optional[Dict[str, Any]] = None
+    # should not exist at top level and instead live in dataset metadata or in .datasets
+    axes: List[Axis]
     datasets: List[MultiscaleDataset]
+    # should not live here, and if it is here, it should default to an empty list instead of being nullable
     coordinateTransformations: Optional[
         List[Union[ScaleTransform, TranslationTransform]]
-    ]  # should not live here, and if it is here, it should default to an empty list instead of being nullable
+    ]
 
     @classmethod
     def fromDataArrays(
