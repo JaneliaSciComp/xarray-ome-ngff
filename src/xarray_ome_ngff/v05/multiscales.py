@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Sequence, Tuple, Union, Literal, Optional
 import numpy as np
 from xarray import DataArray
 from xarray_ome_ngff.base import StrictBaseModel
+import builtins
 
 JSON = Union[Dict[str, "JSON"], List["JSON"], str, int, float, bool, None]
 
@@ -65,12 +66,17 @@ TimeUnit = Literal[
 
 AxisType = Literal[
     "space", "time", "channel"
-]  # axis types should probably be "dimensional" vs "categorical" instead
+]  # axis types should probably be "dimensional" vs "categorical" instead,
+# because "space" and "time" are not really different in any way that matters for an
+# abstract data container spec, and "channels" are not the only non-dimensional
+# quantity that might be represented as the axis of an ndimensional array
 
 
 class PathTransform(
     StrictBaseModel
 ):  # the existence of this type is a massive sinkhole in the spec
+    # translate and scale are both so simple that nobody should be using a path
+    # argument to refer to some remote resource representing a translation or a scale transform
     type: Union[Literal["scale"], Literal["translation"]]
     path: str
 
@@ -132,7 +138,7 @@ class MultiscaleMetadata(BaseModel):
         for arr in arrays:
             if not isinstance(arr, DataArray):
                 raise ValueError(
-                    f"This function requires a list of xarray.DataArrays. Got an element with type {type(arr)} instead."
+                    f"This function requires a list of xarray.DataArrays. Got an element with type {builtins.type(arr)} instead."
                 )
         # sort arrays by decreasing shape
         arrays_sorted = tuple(
