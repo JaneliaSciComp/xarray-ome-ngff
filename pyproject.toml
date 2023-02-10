@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "xarray-ome-ngff"
+version = "0.1.0"
+description = "xarray and ome-ngff"
+authors = ["Davis Vann Bennett <davis.v.bennett@gmail.com>"]
+readme = "README.md"
+packages = [{include = "xarray_ome_ngff"}]
+
+[tool.poetry.dependencies]
+python = ">=3.9,<4.0"
+xarray = "^2023.2.0"
+pydantic = "^1.10.4"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
