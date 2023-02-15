@@ -28,7 +28,23 @@ def create_multiscale_metadata(
                 """
             )
     # sort arrays by decreasing shape
+    ranks = [a.ndim for a in arrays]
+    if len(set(ranks)) > 1:
+        raise ValueError(
+            f"""
+        All arrays must have the same number of dimensions. 
+        Found arrays with different numbers of dimensions: {set(ranks)}.
+        """
+        )
     arrays_sorted = tuple(reversed(sorted(arrays, key=lambda arr: np.prod(arr.shape))))
+    base_transforms = [
+        VectorScaleTransform(
+            scale=[
+                1,
+            ]
+            * ranks[0]
+        )
+    ]
     axes, transforms = tuple(
         zip(*(create_axes_transforms(array) for array in arrays_sorted))
     )
@@ -44,6 +60,7 @@ def create_multiscale_metadata(
         axes=axes[0],
         datasets=datasets,
         metadata=metadata,
+        coordinateTransformations=base_transforms,
     )
 
 
@@ -115,12 +132,12 @@ def create_coords(
     result = {}
 
     for idx, axis in enumerate(axes):
-        base_coord = np.arange(shape[idx])
+        base_coord = np.arange(shape[idx], dtype="float")
         name = axis.name
-        unit = axis.unit
+        units = axis.units
         # apply transforms in order
         for tx in transforms:
-            if type(getattr(tx, "path")) == str:
+            if type(getattr(tx, "path", None)) == str:
                 raise ValueError(
                     f"""
                     Problematic transform: {tx}. 
@@ -128,8 +145,8 @@ def create_coords(
                     """
                 )
 
-            if tx.type == "translate":
-                base_coord += tx.translate[idx]
+            if tx.type == "translation":
+                base_coord += tx.translation[idx]
             elif tx.type == "scale":
                 base_coord *= tx.scale[idx]
             elif tx.type == "identity":
@@ -144,7 +161,7 @@ def create_coords(
 
         result[name] = DataArray(
             base_coord,
-            attrs={"units": unit},
+            attrs={"units": units},
             dims=(name,),
         )
 
