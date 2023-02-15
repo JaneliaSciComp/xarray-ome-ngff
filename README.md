@@ -3,10 +3,8 @@ Integration between xarray and the ome-ngff data model.
 
 At present (February, 2023) this is a partial implementation of the [OME-NGFF spec](https://ngff.openmicroscopy.org/latest/#implementations). Specifcally, *only* the [`multiscales`](https://ngff.openmicroscopy.org/latest/#multiscale-md) and specs required by `multiscales` are implemented. Complete support for the spec would be welcome.
 
-(in progress) This library provides an extension of the OME-NGFF spec, called `OME-NGFF-J`, which adds `axes` and `coordinateTransformations` metadata to datasets inside a group bearing `multiscales` metadata. Hopefully future versions of the OME-NGFF spec adopt this convention or a compatible one, and this extension can be absorbed or replaced.
-
 ## How it works
-OME-NGFF metadata is represented as [pydantic](https://docs.pydantic.dev/) models. 
+This library depends on [`pydantic-ome-ngff`](https://github.com/JaneliaSciComp/pydantic-ome-ngff) which implements OME-NGFF metadata as [pydantic](https://docs.pydantic.dev/) models. 
 [`Axes`](https://ngff.openmicroscopy.org/latest/#axes-md) metadata is inferred from a DataArray by iterating over the dimensions of the array and checking for `units` and `type` properties in the attributes of the `coords` assigned to each dimension. Dimensions without coordinates will raise an exception. Scale and translation `CoordinateTransforms` are inferred by inspecting the values of the coordinates for each dimension. Be advised that no attempt is made to verify that arrays are sampled on a regular grid.
 
 ## Usage
@@ -99,4 +97,10 @@ print(metadata.json(indent=2))
   ],
   "coordinateTransformations": null
 }
+```
+
+It is not possible to create a DataArray from OME-NGFF metadata, but together the OME-NGFF [`Axes`](https://ngff.openmicroscopy.org/latest/#axes-md) and [`CoordinateTransformations`](https://ngff.openmicroscopy.org/latest/#trafo-md) metadata are sufficient to create _coordinates_ for a DataArray, provided you know the shape of the data. The function `AxesTransformsToCoords` performs this operation:
+
+```python
+from xarray_ome_ngff.latest import AxesTransformsToCoords, Axis, 
 ```

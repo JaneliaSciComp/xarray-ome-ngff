@@ -7,14 +7,16 @@ readme = "README.md"
 packages = [{include = "xarray_ome_ngff", from="src"}]
 
 [tool.poetry.dependencies]
-python = ">=3.9,<4.0"
+python = ">=3.10,<4.0"
 xarray = "^2023.2.0"
 pydantic = "^1.10.4"
+pydantic-ome-ngff = "^0.1.0"
 
 
 [tool.poetry.group.dev.dependencies]
 ome-zarr = "^0.6.1"
 pytest = "^7.2.1"
+pre-commit = "^3.0.4"
 
 [build-system]
 requires = ["poetry-core"]
