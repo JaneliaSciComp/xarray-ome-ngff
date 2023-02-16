@@ -4,8 +4,15 @@ import numpy as np
 from xarray_ome_ngff.v05.multiscales import (
     create_axes_transforms,
     create_multiscale_metadata,
+    create_coords,
 )
+
+from pydantic_ome_ngff.v05.axes import Axis
 from pydantic_ome_ngff.v05.multiscales import Multiscale, MultiscaleDataset
+from pydantic_ome_ngff.v05.coordinateTransformations import (
+    VectorScaleTransform,
+    VectorTranslationTransform,
+)
 
 
 def create_array(shape, axes, units, types, scale, translate, **kwargs):
@@ -49,6 +56,37 @@ def test_ome_ngff_from_arrays():
             for idx, m in enumerate(multi)
         ],
         axes=axes[0],
+        coordinateTransformations=[VectorScaleTransform(scale=[1, 1, 1])],
     ).dict()
 
     assert multiscale_meta == expected_meta
+
+
+def test_create_coords():
+    shape = (3, 3)
+    axes = [
+        Axis(name="a", units="meter", type="space"),
+        Axis(name="b", units="kilometer", type="space"),
+    ]
+
+    transforms = [
+        VectorScaleTransform(scale=[1, 0.5]),
+        VectorTranslationTransform(translation=[1, 2]),
+    ]
+
+    coords = create_coords(axes, transforms, shape)
+    assert coords["a"].equals(
+        DataArray(
+            np.array([1.0, 2.0, 3.0]),
+            dims=("a",),
+            attrs={"units": "meter", "type": "space"},
+        )
+    )
+
+    assert coords["b"].equals(
+        DataArray(
+            np.array([2.0, 2.5, 3.0]),
+            dims=("b",),
+            attrs={"units": "kilometer", "type": "space"},
+        )
+    )

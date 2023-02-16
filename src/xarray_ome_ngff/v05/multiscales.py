@@ -117,13 +117,6 @@ def create_coords(
     into xarray-compatible coordinates.
     """
 
-    if len(axes) != len(transforms):
-        raise ValueError(
-            f"""
-            Length of axes must match length of transforms. 
-            Got {len(axes)} axes but {len(transforms)} transforms.
-            """
-        )
     if len(axes) != len(shape):
         raise ValueError(
             f"""Length of axes must match length of shape. 
@@ -146,8 +139,22 @@ def create_coords(
                 )
 
             if tx.type == "translation":
+                if len(tx.translation) != len(axes):
+                    raise ValueError(
+                        f"""
+                    Translation parameter has length {len(tx.translation)} 
+                    does not match the number of axes {len(axes)}.
+                    """
+                    )
                 base_coord += tx.translation[idx]
             elif tx.type == "scale":
+                if len(tx.scale) != len(axes):
+                    raise ValueError(
+                        f"""
+                    Scale parameter has length {len(tx.scale)} 
+                    does not match the number of axes {len(axes)}.
+                    """
+                    )
                 base_coord *= tx.scale[idx]
             elif tx.type == "identity":
                 pass
