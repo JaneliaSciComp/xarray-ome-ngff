@@ -75,7 +75,7 @@ def test_create_coords():
     ]
 
     coords = create_coords(axes, transforms, shape)
-    assert coords["a"].equals(
+    assert coords[0].equals(
         DataArray(
             np.array([1.0, 2.0, 3.0]),
             dims=("a",),
@@ -83,7 +83,7 @@ def test_create_coords():
         )
     )
 
-    assert coords["b"].equals(
+    assert coords[1].equals(
         DataArray(
             np.array([2.0, 2.5, 3.0]),
             dims=("b",),

@@ -110,7 +110,7 @@ def create_axes_transforms(
 
 def create_coords(
     axes: List[Axis], transforms: List[CoordinateTransform], shape: Tuple[int, ...]
-) -> Dict[str, DataArray]:
+) -> List[DataArray]:
     """
     Given an output shape, convert a sequence of Axis objects
     and a corresponding sequence of transform objects
@@ -122,7 +122,8 @@ def create_coords(
             f"""Length of axes must match length of shape. 
             Got {len(axes)} axes but shape has {len(shape)} elements"""
         )
-    result = {}
+
+    result = []
 
     for idx, axis in enumerate(axes):
         base_coord = np.arange(shape[idx], dtype="float")
@@ -166,10 +167,12 @@ def create_coords(
                     """
                 )
 
-        result[name] = DataArray(
-            base_coord,
-            attrs={"units": units},
-            dims=(name,),
+        result.append(
+            DataArray(
+                base_coord,
+                attrs={"units": units},
+                dims=(name,),
+            )
         )
 
     return result
