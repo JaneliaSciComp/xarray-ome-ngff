@@ -42,17 +42,18 @@ def test_ome_ngff_from_arrays():
     coarsen_kwargs = {**{dim: 2 for dim in axes}, "boundary": "trim"}
     multi = [data, data.coarsen(**coarsen_kwargs).mean()]
     multi.append(multi[-1].coarsen(**coarsen_kwargs).mean())
-    for idx, m in enumerate(multi):
-        m.name = f"s{idx}"
+    array_paths = [f"s{idx}" for idx in range(len(multi))]
     axes, transforms = tuple(zip(*(create_axes_transforms(m) for m in multi)))
-    multiscale_meta = create_multiscale_metadata(multi).dict()
+    multiscale_meta = create_multiscale_metadata(multi, array_paths=array_paths).dict()
     expected_meta = Multiscale(
         name=None,
         version="0.5-dev",
         type=None,
         metadata=None,
         datasets=[
-            MultiscaleDataset(path=m.name, coordinateTransformations=transforms[idx])
+            MultiscaleDataset(
+                path=array_paths[idx], coordinateTransformations=transforms[idx]
+            )
             for idx, m in enumerate(multi)
         ],
         axes=axes[0],

@@ -15,6 +15,7 @@ JSON = Union[Dict[str, "JSON"], List["JSON"], str, int, float, bool, None]
 
 def create_multiscale_metadata(
     arrays: Sequence[DataArray],
+    array_paths: Optional[List[str]] = None,
     name: Optional[str] = None,
     type: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None,
@@ -48,7 +49,16 @@ def create_multiscale_metadata(
     axes, transforms = tuple(
         zip(*(create_axes_transforms(array) for array in arrays_sorted))
     )
-    paths = [d.name for d in arrays_sorted]
+    if array_paths is None:
+        paths = [d.name for d in arrays_sorted]
+    else:
+        assert len(array_paths) == len(
+            arrays
+        ), f"""
+        Length of array_paths {len(array_paths)} doesn't match {len(arrays)}
+        """
+        paths = array_paths
+
     datasets = list(
         MultiscaleDataset(path=p, coordinateTransformations=t)
         for p, t in zip(paths, transforms)
