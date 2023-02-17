@@ -7,10 +7,10 @@ readme = "README.md"
 packages = [{include = "xarray_ome_ngff", from="src"}]
 
 [tool.poetry.dependencies]
-python = ">=3.10,<4.0"
+python = "^3.9"
 xarray = "^2023.2.0"
 pydantic = "^1.10.4"
-pydantic-ome-ngff = "^0.1.0"
+pydantic-ome-ngff = { git = "https://github.com/JaneliaSciComp/pydantic-ome-ngff", branch = "main" }
 
 
 [tool.poetry.group.dev.dependencies]

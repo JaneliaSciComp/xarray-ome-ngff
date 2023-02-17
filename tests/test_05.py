@@ -46,9 +46,6 @@ def test_ome_ngff_from_arrays():
     axes, transforms = tuple(zip(*(create_axes_transforms(m) for m in multi)))
     multiscale_meta = create_multiscale_metadata(multi, array_paths=array_paths).dict()
     expected_meta = Multiscale(
-        name=None,
-        type=None,
-        metadata=None,
         datasets=[
             MultiscaleDataset(
                 path=array_paths[idx], coordinateTransformations=transforms[idx]

@@ -143,6 +143,9 @@ files = [
     {file = "aioitertools-0.11.0.tar.gz", hash = "sha256:42c68b8dd3a69c2bf7f2233bf7df4bb58b557bca5252ac02ed5187bbc67d6831"},
 ]
 
+[package.dependencies]
+typing_extensions = {version = ">=4.0", markers = "python_version < \"3.10\""}
+
 [[package]]
 name = "aiosignal"
 version = "1.3.1"
@@ -957,6 +960,7 @@ files = [
 
 [package.dependencies]
 numpy = [
+    {version = ">=1.20.3", markers = "python_version < \"3.10\""},
     {version = ">=1.21.0", markers = "python_version >= \"3.10\""},
     {version = ">=1.23.2", markers = "python_version >= \"3.11\""},
 ]
@@ -1182,18 +1186,22 @@ email = ["email-validator (>=1.0.3)"]
 
 [[package]]
 name = "pydantic-ome-ngff"
-version = "0.1.1"
+version = "0.1.2"
 description = "Pydantic models for the OME-NGFF"
 category = "main"
 optional = false
-python-versions = ">=3.10,<4.0"
-files = [
-    {file = "pydantic_ome_ngff-0.1.1-py3-none-any.whl", hash = "sha256:e5b728aa79d7d4b2346c0aee1b38c452ae631e9a501ad98c2c840290f9195879"},
-    {file = "pydantic_ome_ngff-0.1.1.tar.gz", hash = "sha256:529370a136ba00811ef842641bed273164c0cca1351f3c3980a331056bcb5080"},
-]
+python-versions = "^3.9"
+files = []
+develop = false
 
 [package.dependencies]
-pydantic = ">=1.10.4,<2.0.0"
+pydantic = "^1.10.4"
+
+[package.source]
+type = "git"
+url = "https://github.com/JaneliaSciComp/pydantic-ome-ngff"
+reference = "main"
+resolved_reference = "090eba083013e7b92dce2e908acf778589745389"
 
 [[package]]
 name = "pytest"
@@ -1799,5 +1807,5 @@ jupyter = ["ipytree (>=0.2.2)", "ipywidgets (>=8.0.0)", "notebook"]
 
 [metadata]
 lock-version = "2.0"
-python-versions = ">=3.10,<4.0"
-content-hash = "6587acf71e070e9f90434d4b7a321ecc2de978f5177a5bd78444b393dc4c7a85"
+python-versions = "^3.9"
+content-hash = "5c8991aaa5af1ec417d3eedb32aff03bdaad1ad5abde14467389f939dd77c71f"
