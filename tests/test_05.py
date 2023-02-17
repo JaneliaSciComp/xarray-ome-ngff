@@ -24,7 +24,7 @@ def create_array(shape, axes, units, types, scale, translate, **kwargs):
     for ax, u, sh, sc, tr, ty in zip(axes, units, shape, scale, translate, types):
         coords.append(
             DataArray(
-                (np.arange(sh) * sc) + tr, dims=(ax), attrs={"units": u, "type": ty}
+                (np.arange(sh) * sc) + tr, dims=(ax,), attrs={"unit": u, "type": ty}
             )
         )
 
@@ -66,8 +66,8 @@ def test_ome_ngff_from_arrays():
 def test_create_coords():
     shape = (3, 3)
     axes = [
-        Axis(name="a", units="meter", type="space"),
-        Axis(name="b", units="kilometer", type="space"),
+        Axis(name="a", unit="meter", type="space"),
+        Axis(name="b", unit="kilometer", type="space"),
     ]
 
     transforms = [
@@ -80,7 +80,7 @@ def test_create_coords():
         DataArray(
             np.array([1.0, 2.0, 3.0]),
             dims=("a",),
-            attrs={"units": "meter", "type": "space"},
+            attrs={"unit": "meter", "type": "space"},
         )
     )
 
@@ -88,6 +88,6 @@ def test_create_coords():
         DataArray(
             np.array([2.0, 2.5, 3.0]),
             dims=("b",),
-            attrs={"units": "kilometer", "type": "space"},
+            attrs={"unit": "kilometer", "type": "space"},
         )
     )

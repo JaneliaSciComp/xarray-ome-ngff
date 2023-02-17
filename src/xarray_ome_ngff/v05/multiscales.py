@@ -106,7 +106,7 @@ def create_axes_transforms(
         axes.append(
             Axis(
                 name=d,
-                unit=coord.attrs.get("units", None),
+                unit=coord.attrs.get("unit", None),
                 type=coord.attrs.get("type", None),
             )
         )
@@ -138,7 +138,7 @@ def create_coords(
     for idx, axis in enumerate(axes):
         base_coord = np.arange(shape[idx], dtype="float")
         name = axis.name
-        units = axis.units
+        unit = axis.unit
         # apply transforms in order
         for tx in transforms:
             if type(getattr(tx, "path", None)) == str:
@@ -180,7 +180,7 @@ def create_coords(
         result.append(
             DataArray(
                 base_coord,
-                attrs={"units": units},
+                attrs={"unit": unit},
                 dims=(name,),
             )
         )
