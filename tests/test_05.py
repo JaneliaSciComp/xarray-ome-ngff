@@ -47,7 +47,6 @@ def test_ome_ngff_from_arrays():
     multiscale_meta = create_multiscale_metadata(multi, array_paths=array_paths).dict()
     expected_meta = Multiscale(
         name=None,
-        version="0.5-dev",
         type=None,
         metadata=None,
         datasets=[
