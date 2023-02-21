@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "xarray-ome-ngff"
-version = "0.1.2"
+version = "1.0.0"
 description = "xarray and ome-ngff"
 authors = ["Davis Vann Bennett <davis.v.bennett@gmail.com>"]
 readme = "README.md"

@@ -1,9 +1,9 @@
 from xarray import DataArray
 import numpy as np
-
+from typing import Tuple, Optional, Any
 from xarray_ome_ngff.v05.multiscales import (
-    create_axes_transforms,
-    create_multiscale_metadata,
+    create_transforms,
+    create_multiscale,
     create_coords,
 )
 
@@ -15,16 +15,41 @@ from pydantic_ome_ngff.v05.coordinateTransformations import (
 )
 
 
-def create_array(shape, axes, units, types, scale, translate, **kwargs):
+def create_coord(
+    shape: int,
+    dim: str,
+    unit: Optional[str],
+    type: Optional[str],
+    scale: float,
+    translate: float,
+):
+    return DataArray(
+        (np.arange(shape) * scale) + translate,
+        dims=(dim,),
+        attrs={"unit": unit, "type": type},
+    )
+
+
+def create_array(
+    shape: Tuple[int, ...],
+    dims: Tuple[str, ...],
+    units: Tuple[Optional[str], ...],
+    types: Tuple[Optional[str], ...],
+    scale: Tuple[float, ...],
+    translate: Tuple[float, ...],
+    **kwargs: Any,
+):
     """
     Create a dataarray with a shape and coordinates
     defined by the parameters axes, units, types, scale, translate.
     """
     coords = []
-    for ax, u, sh, sc, tr, ty in zip(axes, units, shape, scale, translate, types):
+    for dim, unit, shp, scle, trns, typ in zip(
+        dims, units, shape, scale, translate, types
+    ):
         coords.append(
-            DataArray(
-                (np.arange(sh) * sc) + tr, dims=(ax,), attrs={"unit": u, "type": ty}
+            create_coord(
+                shape=shp, dim=dim, unit=unit, type=typ, scale=scle, translate=trns
             )
         )
 
@@ -43,9 +68,12 @@ def test_ome_ngff_from_arrays():
     multi = [data, data.coarsen(**coarsen_kwargs).mean()]
     multi.append(multi[-1].coarsen(**coarsen_kwargs).mean())
     array_paths = [f"s{idx}" for idx in range(len(multi))]
-    axes, transforms = tuple(zip(*(create_axes_transforms(m) for m in multi)))
-    multiscale_meta = create_multiscale_metadata(multi, array_paths=array_paths).dict()
+    axes, transforms = tuple(zip(*(create_transforms(m) for m in multi)))
+    multiscale_meta = create_multiscale(
+        multi, array_paths=array_paths, name="foo"
+    ).dict()
     expected_meta = Multiscale(
+        name="foo",
         datasets=[
             MultiscaleDataset(
                 path=array_paths[idx], coordinateTransformations=transforms[idx]
@@ -87,3 +115,42 @@ def test_create_coords():
             attrs={"unit": "kilometer", "type": "space"},
         )
     )
+
+
+def test_create_axes_transforms():
+    shape = (10, 10, 10)
+    dims = ("z", "y", "x")
+    units = ("meter", "nanometer", "kilometer")
+    types = ("space",) * 3
+    scale = (1, 2, 3)
+    translate = (-1, 2, 0)
+
+    array = create_array(
+        shape=shape,
+        dims=dims,
+        units=units,
+        types=types,
+        scale=scale,
+        translate=translate,
+    )
+
+    axes, transforms = create_transforms(array)
+    scale_tx, translation_tx = transforms
+
+    for idx, ax in enumerate(axes):
+        assert ax.unit == units[idx]
+        assert ax.type == types[idx]
+        assert ax.name == dims[idx]
+        assert scale_tx.scale[idx] == scale[idx]
+        assert translation_tx.translation[idx] == translate[idx]
+
+    # change 'unit' to 'units' in coordinate metadata
+    for dim in array.dims:
+        unit = array.coords[dim].attrs.pop("unit")
+        array.coords[dim].attrs["units"] = unit
+
+    axes, transforms = create_transforms(array)
+    scale_tx, translation_tx = transforms
+
+    for idx, ax in enumerate(axes):
+        assert ax.unit == units[idx]
