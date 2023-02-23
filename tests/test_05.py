@@ -13,6 +13,9 @@ from pydantic_ome_ngff.v05.coordinateTransformations import (
     VectorScaleTransform,
     VectorTranslationTransform,
 )
+import pint
+
+ureg = pint.UnitRegistry()
 
 
 def create_coord(
@@ -154,3 +157,58 @@ def test_create_axes_transforms():
 
     for idx, ax in enumerate(axes):
         assert ax.unit == units[idx]
+
+
+def test_normalize_units():
+    shape = (10, 10, 10)
+    dims = ("z", "y", "x")
+    units = ("m", "nm", "km")
+    types = ("space",) * 3
+    scale = (1, 2, 3)
+    translate = (-1, 2, 0)
+
+    array = create_array(
+        shape=shape,
+        dims=dims,
+        units=units,
+        types=types,
+        scale=scale,
+        translate=translate,
+    )
+
+    axes, _ = create_transforms(array)
+    assert all(
+        ax.unit == ureg.get_name(d, case_sensitive=True) for ax, d in zip(axes, units)
+    )
+
+    axes, _ = create_transforms(array, normalize_units=False)
+    assert all(ax.unit == d for ax, d in zip(axes, units))
+
+
+def test_infer_axis_type():
+    shape = (1, 10, 10, 10)
+    dims = ("t", "z", "y", "x")
+    units = ("second", "meter", "nanometer", "kilometer")
+    types = (None, "space", None, "time")
+    scale = (1, 1, 2, 3)
+    translate = (0, -1, 2, 0)
+
+    array = create_array(
+        shape=shape,
+        dims=dims,
+        units=units,
+        types=types,
+        scale=scale,
+        translate=translate,
+    )
+
+    axes, _ = create_transforms(array)
+    for ax, typ in zip(axes, types):
+        if typ is None:
+            base_unit = ureg.get_base_units(ax.unit)[-1]
+            if base_unit == ureg["meter"]:
+                assert ax.type == "space"
+            elif base_unit == ureg["second"]:
+                assert ax.type == "time"
+        else:
+            assert ax.type == typ

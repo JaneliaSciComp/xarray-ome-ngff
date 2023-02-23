@@ -10,8 +10,11 @@ from pydantic_ome_ngff.v05.coordinateTransformations import (
 )
 import builtins
 import warnings
+import pint
 
 JSON = Union[Dict[str, "JSON"], List["JSON"], str, int, float, bool, None]
+
+ureg = pint.UnitRegistry()
 
 
 def create_multiscale(
@@ -20,6 +23,8 @@ def create_multiscale(
     name: Optional[str] = None,
     type: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None,
+    normalize_units: bool = True,
+    infer_axis_type: bool = True,
 ):
     """
     Create Multiscale metadata from a collection of xarray.DataArrays
@@ -44,6 +49,15 @@ def create_multiscale(
     metadata: dict, optional
         Additional metadata associated with this multiscale collection. Used to populate
         the 'metadata' field of Multiscale metadata.
+
+    normalize_units: bool, defaults to True
+        Whether to normalize units to standard names, e.g. 'nm' -> 'nanometer'
+
+    infer_axis_type: bool, defaults to True
+        Whether to infer the `type` field of the axis from units, e.g. if units are
+        "nanometer" then the type of the axis can safely be assumed to be "space".
+        This keyword argument is ignored if `type` is not None in the array coordinate
+        metadata. If axis type inference fails, `type` will be set to None.
 
     Returns
     -------
@@ -78,7 +92,12 @@ def create_multiscale(
         )
     ]
     axes, transforms = tuple(
-        zip(*(create_transforms(array) for array in arrays_sorted))
+        zip(
+            *(
+                create_transforms(array, normalize_units=normalize_units)
+                for array in arrays_sorted
+            )
+        )
     )
     if array_paths is None:
         paths = [d.name for d in arrays_sorted]
@@ -106,7 +125,7 @@ def create_multiscale(
 
 
 def create_transforms(
-    array: DataArray,
+    array: DataArray, normalize_units: bool = True, infer_axis_type=True
 ) -> Tuple[Tuple[Axis, ...], Tuple[VectorScaleTransform, VectorTranslationTransform]]:
     """
     Generate Axes and CoordinateTransformations from an xarray.DataArray.
@@ -122,6 +141,15 @@ def create_transforms(
         attributes of each coordinate for the 'unit' key, and if that key is not present
         then the 'units' key is queried. Axis names are inferred from the dimensions
         of the array.
+
+    normalize_units: bool, defaults to True
+        If True, unit strings will be normalized to a canonical representation using the
+        `pint` library. For example, the abbreviation "nm" will be normalized to
+        "nanometer".
+
+    infer_axis_type: bool, defaults to True
+        Whether to infer the axis type from the units. This will have no effect if
+        the array has 'type' in its attrs.
 
     Returns
     -------
@@ -145,16 +173,12 @@ def create_transforms(
                 coordinates.
                 """
             )
-
-        if len(coord) <= 1:
-            raise ValueError(
-                f"""
-                Cannot infer scale parameter along dimension '{d}' with length = 
-                {len(coord)}
-                """
-            )
         translate.append(float(coord[0]))
-        scale.append(abs(float(coord[1]) - float(coord[0])))
+        # impossible to infer a scale coordinate from a coordinate with 1 sample
+        if len(coord) > 1:
+            scale.append(abs(float(coord[1]) - float(coord[0])))
+        else:
+            scale.append(1)
         unit = coord.attrs.get("unit", None)
         units = coord.attrs.get("units", None)
         if unit is None and units is not None:
@@ -174,11 +198,39 @@ def create_transforms(
             used in the axis metadata.
             """
             )
+        if normalize_units:
+            unit = ureg.get_name(unit, case_sensitive=True)
+        if (type := coord.attrs.get("type", None)) is None and infer_axis_type:
+            unit_dimensionality = ureg.get_dimensionality(unit)
+            if len(unit_dimensionality) > 1:
+                warnings.warn(
+                    """
+                Failed to infer the type of axis with unit = "{unit}", because it 
+                appears that unit "{unit}" is a compound unit, which cannot be mapped
+                to a single axis type. "type" will be set to None for this axis.
+                """,
+                    RuntimeWarning,
+                )
+            if "[length]" in unit_dimensionality:
+                type = "space"
+            elif "[time]" in unit_dimensionality:
+                type = "time"
+            else:
+                warnings.warn(
+                    """
+                Failed to infer the type of axis with unit = "{unit}", because it could 
+                not be mapped to either a time or space dimension. "type" will be set to
+                None for this axis.
+                """,
+                    RuntimeWarning,
+                )
+                type = None
+
         axes.append(
             Axis(
                 name=d,
                 unit=unit,
-                type=coord.attrs.get("type", None),
+                type=type,
             )
         )
 
@@ -215,7 +267,7 @@ def create_coords(
                 raise ValueError(
                     f"""
                     Problematic transform: {tx}. 
-                    This library is not capable of handling transforms with paths.
+                    This library does not handle transforms with paths.
                     """
                 )
 
@@ -223,8 +275,8 @@ def create_coords(
                 if len(tx.translation) != len(axes):
                     raise ValueError(
                         f"""
-                    Translation parameter has length {len(tx.translation)} 
-                    does not match the number of axes {len(axes)}.
+                    Translation parameter has length {len(tx.translation)}. This does 
+                    not match the number of axes {len(axes)}.
                     """
                     )
                 base_coord += tx.translation[idx]
@@ -232,8 +284,8 @@ def create_coords(
                 if len(tx.scale) != len(axes):
                     raise ValueError(
                         f"""
-                    Scale parameter has length {len(tx.scale)} 
-                    does not match the number of axes {len(axes)}.
+                    Scale parameter has length {len(tx.scale)}. This does not match the 
+                    number of axes {len(axes)}.
                     """
                     )
                 base_coord *= tx.scale[idx]
@@ -242,8 +294,8 @@ def create_coords(
             else:
                 raise ValueError(
                     f"""
-                    Transform type {tx.type} not recognized. 
-                    Must be one of scale, translate, or identity
+                    Transform type {tx.type} not recognized. Must be one of scale, 
+                    translate, or identity
                     """
                 )
 
