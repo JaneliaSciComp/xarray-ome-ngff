@@ -186,12 +186,17 @@ def test_normalize_units():
 
 
 def test_infer_axis_type():
-    shape = (1, 10, 10, 10)
-    dims = ("t", "z", "y", "x")
-    units = ("second", "meter", "nanometer", "kilometer")
-    types = (None, "space", None, "time")
-    scale = (1, 1, 2, 3)
-    translate = (0, -1, 2, 0)
+    shape = (
+        1,
+        10,
+        10,
+        10,
+    )
+    dims = ("c", "t", "z", "y", "x")
+    units = (None, "second", "meter", "nanometer", "kilometer")
+    types = (None, None, "space", None, "time")
+    scale = (1, 1, 1, 2, 3)
+    translate = (0, 0, -1, 2, 0)
 
     array = create_array(
         shape=shape,

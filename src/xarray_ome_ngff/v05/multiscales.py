@@ -198,7 +198,7 @@ def create_transforms(
             used in the axis metadata.
             """
             )
-        if normalize_units:
+        if normalize_units and unit is not None:
             unit = ureg.get_name(unit, case_sensitive=True)
         if (type := coord.attrs.get("type", None)) is None and infer_axis_type:
             unit_dimensionality = ureg.get_dimensionality(unit)
