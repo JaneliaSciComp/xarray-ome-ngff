@@ -1,6 +1,6 @@
 # ruff: noqa
-from xarray_ome_ngff.v05.multiscales import (
-    create_coords,
-    create_transforms,
-    create_multiscale,
+from xarray_ome_ngff.latest.multiscales import (
+    coords_to_transforms,
+    transforms_to_coords,
+    multiscale_metadata,
 )

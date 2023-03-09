@@ -1,23 +1,19 @@
-from typing import Any, Dict, List, Sequence, Tuple, Union, Optional
+from typing import Any, Dict, List, Sequence, Tuple, Optional
 import numpy as np
 from xarray import DataArray
-from pydantic_ome_ngff.v05.axes import Axis
-from pydantic_ome_ngff.v05.multiscales import MultiscaleDataset, Multiscale
-from pydantic_ome_ngff.v05.coordinateTransformations import (
+from pydantic_ome_ngff.latest.axes import Axis
+from pydantic_ome_ngff.latest.multiscales import MultiscaleDataset, Multiscale
+from pydantic_ome_ngff.latest.coordinateTransformations import (
     VectorScaleTransform,
     VectorTranslationTransform,
     CoordinateTransform,
 )
 import builtins
 import warnings
-import pint
-
-JSON = Union[Dict[str, "JSON"], List["JSON"], str, int, float, bool, None]
-
-ureg = pint.UnitRegistry()
+from xarray_ome_ngff.core import ureg
 
 
-def create_multiscale(
+def multiscale_metadata(
     arrays: Sequence[DataArray],
     array_paths: Optional[List[str]] = None,
     name: Optional[str] = None,
@@ -94,7 +90,11 @@ def create_multiscale(
     axes, transforms = tuple(
         zip(
             *(
-                create_transforms(array, normalize_units=normalize_units)
+                coords_to_transforms(
+                    tuple(array.coords.values()),
+                    normalize_units=normalize_units,
+                    infer_axis_type=infer_axis_type,
+                )
                 for array in arrays_sorted
             )
         )
@@ -114,7 +114,6 @@ def create_multiscale(
         for p, t in zip(paths, transforms)
     )
     return Multiscale(
-        version="0.5-dev",
         name=name,
         type=type,
         axes=axes[0],
@@ -124,8 +123,8 @@ def create_multiscale(
     )
 
 
-def create_transforms(
-    array: DataArray, normalize_units: bool = True, infer_axis_type=True
+def coords_to_transforms(
+    coords: Tuple[DataArray, ...], normalize_units: bool = True, infer_axis_type=True
 ) -> Tuple[Tuple[Axis, ...], Tuple[VectorScaleTransform, VectorTranslationTransform]]:
     """
     Generate Axes and CoordinateTransformations from an xarray.DataArray.
@@ -163,16 +162,15 @@ def create_transforms(
     translate = []
     scale = []
     axes = []
-    for d in array.dims:
-        try:
-            coord = array[d]
-        except KeyError:
+    for coord in coords:
+        if ndim := len(coord.dims) != 1:
             raise ValueError(
                 f"""
-                Dimension '{d}' does not have coordinates. All dimensions must have 
-                coordinates.
-                """
+            Each coordinate must have one and only one dimension.
+            Got a coordinate with {ndim}.
+                             """
             )
+        dim = coord.dims[0]
         translate.append(float(coord[0]))
         # impossible to infer a scale coordinate from a coordinate with 1 sample
         if len(coord) > 1:
@@ -228,7 +226,7 @@ def create_transforms(
 
         axes.append(
             Axis(
-                name=d,
+                name=dim,
                 unit=unit,
                 type=type,
             )
@@ -241,7 +239,7 @@ def create_transforms(
     return axes, transforms
 
 
-def create_coords(
+def transforms_to_coords(
     axes: List[Axis], transforms: List[CoordinateTransform], shape: Tuple[int, ...]
 ) -> List[DataArray]:
     """
