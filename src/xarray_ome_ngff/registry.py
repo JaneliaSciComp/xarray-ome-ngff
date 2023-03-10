@@ -2,14 +2,14 @@ from typing import NamedTuple, Callable, Any
 from xarray_ome_ngff.core import ngff_versions
 
 
-class MetadataAdaptors(NamedTuple):
+class Metadataadapters(NamedTuple):
     ngff_version: str
     multiscale_metadata: Callable[[Any], Any]
     transforms_to_coords: Callable[[Any], Any]
     coords_to_transforms: Callable[[Any], Any]
 
 
-def get_adaptors(version: str):
+def get_adapters(version: str):
     if version == "0.4":
         from xarray_ome_ngff.v04.multiscales import (
             multiscale_metadata,
@@ -17,7 +17,7 @@ def get_adaptors(version: str):
             coords_to_transforms,
         )
 
-        return MetadataAdaptors(
+        return Metadataadapters(
             ngff_version="0.4",
             multiscale_metadata=multiscale_metadata,
             transforms_to_coords=transforms_to_coords,
@@ -31,7 +31,7 @@ def get_adaptors(version: str):
             coords_to_transforms,
         )
 
-        return MetadataAdaptors(
+        return Metadataadapters(
             ngff_version="0.5-dev",
             multiscale_metadata=multiscale_metadata,
             transforms_to_coords=transforms_to_coords,
