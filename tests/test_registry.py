@@ -4,7 +4,7 @@ import pytest
 
 
 @pytest.mark.parametrize("version", [*ngff_versions, "latest"])
-def test_registry(version):
+def test_registry(version: str):
     adaptors = get_adaptors(version)
     if adaptors.ngff_version == "0.4":
         from xarray_ome_ngff.v04.multiscales import (
