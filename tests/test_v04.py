@@ -1,15 +1,15 @@
 from xarray import DataArray
 import numpy as np
 from typing import Tuple, Optional, Any
-from xarray_ome_ngff.v05.multiscales import (
-    create_transforms,
-    create_multiscale,
-    create_coords,
+from xarray_ome_ngff.v04.multiscales import (
+    coords_to_transforms,
+    multiscale_metadata,
+    transforms_to_coords,
 )
 
-from pydantic_ome_ngff.v05.axes import Axis
-from pydantic_ome_ngff.v05.multiscales import Multiscale, MultiscaleDataset
-from pydantic_ome_ngff.v05.coordinateTransformations import (
+from pydantic_ome_ngff.v04.axes import Axis
+from pydantic_ome_ngff.v04.multiscales import Multiscale, MultiscaleDataset
+from pydantic_ome_ngff.v04.coordinateTransformations import (
     VectorScaleTransform,
     VectorTranslationTransform,
 )
@@ -71,8 +71,10 @@ def test_ome_ngff_from_arrays():
     multi = [data, data.coarsen(**coarsen_kwargs).mean()]
     multi.append(multi[-1].coarsen(**coarsen_kwargs).mean())
     array_paths = [f"s{idx}" for idx in range(len(multi))]
-    axes, transforms = tuple(zip(*(create_transforms(m) for m in multi)))
-    multiscale_meta = create_multiscale(
+    axes, transforms = tuple(
+        zip(*(coords_to_transforms(tuple(m.coords.values())) for m in multi))
+    )
+    multiscale_meta = multiscale_metadata(
         multi, array_paths=array_paths, name="foo"
     ).dict()
     expected_meta = Multiscale(
@@ -102,7 +104,7 @@ def test_create_coords():
         VectorTranslationTransform(translation=[1, 2]),
     ]
 
-    coords = create_coords(axes, transforms, shape)
+    coords = transforms_to_coords(axes, transforms, shape)
     assert coords[0].equals(
         DataArray(
             np.array([1.0, 2.0, 3.0]),
@@ -137,7 +139,7 @@ def test_create_axes_transforms():
         translate=translate,
     )
 
-    axes, transforms = create_transforms(array)
+    axes, transforms = coords_to_transforms(tuple(array.coords.values()))
     scale_tx, translation_tx = transforms
 
     for idx, ax in enumerate(axes):
@@ -152,7 +154,7 @@ def test_create_axes_transforms():
         unit = array.coords[dim].attrs.pop("unit")
         array.coords[dim].attrs["units"] = unit
 
-    axes, transforms = create_transforms(array)
+    axes, transforms = coords_to_transforms(array.coords.values())
     scale_tx, translation_tx = transforms
 
     for idx, ax in enumerate(axes):
@@ -176,12 +178,12 @@ def test_normalize_units():
         translate=translate,
     )
 
-    axes, _ = create_transforms(array)
+    axes, _ = coords_to_transforms(array.coords.values())
     assert all(
         ax.unit == ureg.get_name(d, case_sensitive=True) for ax, d in zip(axes, units)
     )
 
-    axes, _ = create_transforms(array, normalize_units=False)
+    axes, _ = coords_to_transforms(array.coords.values(), normalize_units=False)
     assert all(ax.unit == d for ax, d in zip(axes, units))
 
 
@@ -207,7 +209,7 @@ def test_infer_axis_type():
         translate=translate,
     )
 
-    axes, _ = create_transforms(array)
+    axes, _ = coords_to_transforms(array.coords.values())
     for ax, typ in zip(axes, types):
         if typ is None:
             base_unit = ureg.get_base_units(ax.unit)[-1]
