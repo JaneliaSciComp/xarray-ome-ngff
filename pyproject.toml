@@ -9,15 +9,15 @@ packages = [{include = "xarray_ome_ngff", from="src"}]
 [tool.poetry.dependencies]
 python = "^3.9"
 xarray = "^2023.2.0"
-pydantic = "^1.10.4"
 pydantic-ome-ngff = "^0.2.0"
 pint = "^0.20.1"
+pydantic = "^1.10.7"
 
 
 [tool.poetry.group.dev.dependencies]
-ome-zarr = "^0.6.1"
 pytest = "^7.2.1"
 pre-commit = "^3.0.4"
+mypy = "^1.1.1"
 
 [build-system]
 requires = ["poetry-core"]

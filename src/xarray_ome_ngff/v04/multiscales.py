@@ -100,7 +100,7 @@ def multiscale_metadata(
         )
     )
     if array_paths is None:
-        paths = [d.name for d in arrays_sorted]
+        paths = [str(d.name) for d in arrays_sorted]
     else:
         assert len(array_paths) == len(
             arrays
@@ -202,7 +202,7 @@ def coords_to_transforms(
             unit_dimensionality = ureg.get_dimensionality(unit)
             if len(unit_dimensionality) > 1:
                 warnings.warn(
-                    """
+                    f"""
                 Failed to infer the type of axis with unit = "{unit}", because it 
                 appears that unit "{unit}" is a compound unit, which cannot be mapped
                 to a single axis type. "type" will be set to None for this axis.
@@ -215,7 +215,7 @@ def coords_to_transforms(
                 type = "time"
             else:
                 warnings.warn(
-                    """
+                    f"""
                 Failed to infer the type of axis with unit = "{unit}", because it could 
                 not be mapped to either a time or space dimension. "type" will be set to
                 None for this axis.
