@@ -21,7 +21,7 @@ def multiscale_metadata(
     metadata: Optional[Dict[str, Any]] = None,
     normalize_units: bool = True,
     infer_axis_type: bool = True,
-):
+) -> Multiscale:
     """
     Create Multiscale metadata from a collection of xarray.DataArrays
 
@@ -63,28 +63,26 @@ def multiscale_metadata(
     """
     for arr in arrays:
         if not isinstance(arr, DataArray):
-            raise ValueError(
-                f"""
-                This function requires a list of xarray.DataArrays. Got an element with 
-                type = '{builtins.type(arr)}' instead.
-                """
+            msg = (
+                "This function requires a list of xarray.DataArrays. Got an element "
+                f"with type = '{builtins.type(arr)}' instead."
             )
+            raise ValueError(msg)
     # sort arrays by decreasing shape
-    ranks = [a.ndim for a in arrays]
-    if len(set(ranks)) > 1:
-        raise ValueError(
-            f"""
-        All arrays must have the same number of dimensions. Found arrays with different 
-        numbers of dimensions: {set(ranks)}.
-        """
+    ndims = [a.ndim for a in arrays]
+    if len(set(ndims)) > 1:
+        msg = (
+            "All arrays must have the same number of dimensions. Found arrays with "
+            f"different numbers of dimensions: {set(ndims)}."
         )
+        raise ValueError(msg)
     arrays_sorted = tuple(reversed(sorted(arrays, key=lambda arr: np.prod(arr.shape))))
     base_transforms = [
         VectorScaleTransform(
             scale=[
                 1,
             ]
-            * ranks[0]
+            * ndims[0]
         )
     ]
     axes, transforms = tuple(
@@ -104,9 +102,7 @@ def multiscale_metadata(
     else:
         assert len(array_paths) == len(
             arrays
-        ), f"""
-        Length of array_paths {len(array_paths)} doesn't match {len(arrays)}
-        """
+        ), f"Length of array_paths {len(array_paths)} doesn't match {len(arrays)}"
         paths = array_paths
 
     datasets = list(
@@ -164,12 +160,11 @@ def coords_to_transforms(
     axes = []
     for coord in coords:
         if ndim := len(coord.dims) != 1:
-            raise ValueError(
-                f"""
-            Each coordinate must have one and only one dimension.
-            Got a coordinate with {ndim}.
-                             """
+            msg = (
+                "Each coordinate must have one and only one dimension. "
+                f"Got a coordinate with {ndim}."
             )
+            raise ValueError(msg)
         dim = coord.dims[0]
         translate.append(float(coord[0]))
         # impossible to infer a scale coordinate from a coordinate with 1 sample
@@ -180,33 +175,33 @@ def coords_to_transforms(
         unit = coord.attrs.get("unit", None)
         units = coord.attrs.get("units", None)
         if unit is None and units is not None:
-            warnings.warn(
-                f"""
-            The key 'unit' was unset, but 'units' was found in array attrs, with a value
-            of '{units}'. The 'unit' property of the corresponding axis will be set to
-            '{units}', but this behavior may change in the future.
-            """
+            msg = (
+                "The key 'unit' was unset, but 'units' was found in array attrs, "
+                f"with a value of \"{units}\". The 'unit' property of the "
+                f'corresponding axis will be set to "{units}", but this behavior '
+                "may change in the future."
             )
+            warnings.warn(msg)
             unit = units
         elif units is not None:
-            warnings.warn(
-                f"""
-            Both 'unit' and 'units' were found in array attrs, with values '{unit}' and 
-            '{units}', respectively. The value associated with 'unit' ({unit}) will be
-            used in the axis metadata.
-            """
+            msg = (
+                'Both "unit" and "units" were found in array attrs, with values '
+                f'"{unit}" and "{units}", respectively. The value associated '
+                f'with "unit" ({unit}) will be used in the axis metadata.'
             )
+            warnings.warn(msg)
         if normalize_units and unit is not None:
             unit = ureg.get_name(unit, case_sensitive=True)
         if (type := coord.attrs.get("type", None)) is None and infer_axis_type:
             unit_dimensionality = ureg.get_dimensionality(unit)
             if len(unit_dimensionality) > 1:
+                msg = (
+                    f'Failed to infer the type of axis with unit = "{unit}"',
+                    f'because it appears that unit "{unit}" is a compound unit, '
+                    'which cannot be mapped to a single axis type. "type" will be '
+                    'set to "None" for this axis.',
+                )
                 warnings.warn(
-                    f"""
-                Failed to infer the type of axis with unit = "{unit}", because it 
-                appears that unit "{unit}" is a compound unit, which cannot be mapped
-                to a single axis type. "type" will be set to None for this axis.
-                """,
                     RuntimeWarning,
                 )
             if "[length]" in unit_dimensionality:
@@ -214,14 +209,12 @@ def coords_to_transforms(
             elif "[time]" in unit_dimensionality:
                 type = "time"
             else:
-                warnings.warn(
-                    f"""
-                Failed to infer the type of axis with unit = "{unit}", because it could 
-                not be mapped to either a time or space dimension. "type" will be set to
-                None for this axis.
-                """,
-                    RuntimeWarning,
+                msg = (
+                    f'Failed to infer the type of axis with unit = "{unit}", '
+                    "because it could not be mapped to either a time or space "
+                    'dimension. "type" will be set to None for this axis.'
                 )
+                warnings.warn(msg, RuntimeWarning)
                 type = None
 
         axes.append(
@@ -248,10 +241,11 @@ def transforms_to_coords(
     """
 
     if len(axes) != len(shape):
-        raise ValueError(
-            f"""Length of axes must match length of shape. 
-            Got {len(axes)} axes but shape has {len(shape)} elements"""
+        msg = (
+            "Length of axes must match length of shape. "
+            f"Got {len(axes)} axes but shape has {len(shape)} elements"
         )
+        raise ValueError(msg)
 
     result = []
 
@@ -262,40 +256,37 @@ def transforms_to_coords(
         # apply transforms in order
         for tx in transforms:
             if type(getattr(tx, "path", None)) == str:
-                raise ValueError(
-                    f"""
-                    Problematic transform: {tx}. 
-                    This library does not handle transforms with paths.
-                    """
+                msg = (
+                    f"Problematic transform: {tx}. This library cannot handle "
+                    "transforms with paths. Resolve this path to a literal scale or "
+                    "translation"
                 )
+                raise ValueError(msg)
 
             if tx.type == "translation":
                 if len(tx.translation) != len(axes):
-                    raise ValueError(
-                        f"""
-                    Translation parameter has length {len(tx.translation)}. This does 
-                    not match the number of axes {len(axes)}.
-                    """
+                    msg = (
+                        f"Translation parameter has length {len(tx.translation)}. "
+                        f"This does not match the number of axes {len(axes)}."
                     )
+                    raise ValueError(msg)
                 base_coord += tx.translation[idx]
             elif tx.type == "scale":
                 if len(tx.scale) != len(axes):
-                    raise ValueError(
-                        f"""
-                    Scale parameter has length {len(tx.scale)}. This does not match the 
-                    number of axes {len(axes)}.
-                    """
+                    msg = (
+                        f"Scale parameter has length {len(tx.scale)}. "
+                        f"This does not match the number of axes {len(axes)}."
                     )
+                    raise ValueError(msg)
                 base_coord *= tx.scale[idx]
             elif tx.type == "identity":
                 pass
             else:
-                raise ValueError(
-                    f"""
-                    Transform type {tx.type} not recognized. Must be one of scale, 
-                    translate, or identity
-                    """
+                msg = (
+                    f"Transform type {tx.type} not recognized. Must be one of scale, "
+                    "translation, or identity"
                 )
+                raise ValueError(msg)
 
         result.append(
             DataArray(

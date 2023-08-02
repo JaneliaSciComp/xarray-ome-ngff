@@ -1,6 +1,6 @@
+from importlib.metadata import version as _version
+
+__version__ = _version(__name__)
+
 # ruff: noqa
-from xarray_ome_ngff.latest.multiscales import (
-    coords_to_transforms,
-    transforms_to_coords,
-    multiscale_metadata,
-)
+from xarray_ome_ngff.registry import get_adapters
