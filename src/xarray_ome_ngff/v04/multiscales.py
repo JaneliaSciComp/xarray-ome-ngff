@@ -1,24 +1,32 @@
-from typing import Any, Dict, List, Sequence, Tuple, Optional
-import numpy as np
-from xarray import DataArray
-from pydantic_ome_ngff.v04.axes import Axis
-from pydantic_ome_ngff.v04.multiscales import MultiscaleDataset, Multiscale
-from pydantic_ome_ngff.v04.coordinateTransformations import (
-    VectorScaleTransform,
-    VectorTranslationTransform,
-    CoordinateTransform,
-)
+from __future__ import annotations
+
 import builtins
 import warnings
+from typing import TYPE_CHECKING, Any
+
+import numpy as np
+from pydantic_ome_ngff.v04.axes import Axis
+from pydantic_ome_ngff.v04.coordinateTransformations import (
+    CoordinateTransform,
+    VectorScaleTransform,
+    VectorTranslationTransform,
+)
+from pydantic_ome_ngff.v04.multiscales import Multiscale, MultiscaleDataset
+from xarray import DataArray
+
 from xarray_ome_ngff.core import ureg
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 def multiscale_metadata(
     arrays: Sequence[DataArray],
-    array_paths: Optional[List[str]] = None,
-    name: Optional[str] = None,
-    type: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None,
+    *,
+    array_paths: list[str] | None = None,
+    name: str | None = None,
+    multiscale_type: str | None = None,
+    metadata: dict[str, Any] | None = None,
     normalize_units: bool = True,
     infer_axis_type: bool = True,
 ) -> Multiscale:
@@ -38,7 +46,7 @@ def multiscale_metadata(
         The name of the multiscale collection. Used to populate the 'name' field of
         Multiscale metadata.
 
-    type: string, optional
+    multiscale_type: string, optional
         The type of the multiscale collection. Used to populate the 'type' field of
         Multiscale metadata.
 
@@ -67,7 +75,7 @@ def multiscale_metadata(
                 "This function requires a list of xarray.DataArrays. Got an element "
                 f"with type = '{builtins.type(arr)}' instead."
             )
-            raise ValueError(msg)
+            raise TypeError(msg)
     # sort arrays by decreasing shape
     ndims = [a.ndim for a in arrays]
     if len(set(ndims)) > 1:
@@ -76,7 +84,9 @@ def multiscale_metadata(
             f"different numbers of dimensions: {set(ndims)}."
         )
         raise ValueError(msg)
-    arrays_sorted = tuple(reversed(sorted(arrays, key=lambda arr: np.prod(arr.shape))))
+    arrays_sorted = tuple(
+        sorted(arrays, key=lambda arr: np.prod(arr.shape), reverse=True)
+    )
     base_transforms = [
         VectorScaleTransform(
             scale=[
@@ -100,18 +110,18 @@ def multiscale_metadata(
     if array_paths is None:
         paths = [str(d.name) for d in arrays_sorted]
     else:
-        assert len(array_paths) == len(
-            arrays
-        ), f"Length of array_paths {len(array_paths)} doesn't match {len(arrays)}"
+        if len(array_paths) != len(arrays):
+            msg = f"Number of array_paths ({len(array_paths)}) doesn't match number of arrays ({len(arrays)})"
+            raise ValueError(msg)
         paths = array_paths
 
-    datasets = list(
+    datasets = [
         MultiscaleDataset(path=p, coordinateTransformations=t)
         for p, t in zip(paths, transforms)
-    )
+    ]
     return Multiscale(
         name=name,
-        type=type,
+        type=multiscale_type,
         axes=axes[0],
         datasets=datasets,
         metadata=metadata,
@@ -120,8 +130,8 @@ def multiscale_metadata(
 
 
 def coords_to_transforms(
-    coords: Tuple[DataArray, ...], normalize_units: bool = True, infer_axis_type=True
-) -> Tuple[Tuple[Axis, ...], Tuple[VectorScaleTransform, VectorTranslationTransform]]:
+    coords: tuple[DataArray, ...], *, normalize_units: bool = True, infer_axis_type=True
+) -> tuple[tuple[Axis, ...], tuple[VectorScaleTransform, VectorTranslationTransform]]:
     """
     Generate Axes and CoordinateTransformations from an xarray.DataArray.
 
@@ -158,6 +168,8 @@ def coords_to_transforms(
     translate = []
     scale = []
     axes = []
+    axis_type: str
+
     for coord in coords:
         if ndim := len(coord.dims) != 1:
             msg = (
@@ -175,13 +187,6 @@ def coords_to_transforms(
         unit = coord.attrs.get("unit", None)
         units = coord.attrs.get("units", None)
         if unit is None and units is not None:
-            msg = (
-                "The key 'unit' was unset, but 'units' was found in array attrs, "
-                f"with a value of \"{units}\". The 'unit' property of the "
-                f'corresponding axis will be set to "{units}", but this behavior '
-                "may change in the future."
-            )
-            warnings.warn(msg)
             unit = units
         elif units is not None:
             msg = (
@@ -189,10 +194,10 @@ def coords_to_transforms(
                 f'"{unit}" and "{units}", respectively. The value associated '
                 f'with "unit" ({unit}) will be used in the axis metadata.'
             )
-            warnings.warn(msg)
+            warnings.warn(msg, stacklevel=1)
         if normalize_units and unit is not None:
             unit = ureg.get_name(unit, case_sensitive=True)
-        if (type := coord.attrs.get("type", None)) is None and infer_axis_type:
+        if (axis_type := coord.attrs.get("type", None)) is None and infer_axis_type:
             unit_dimensionality = ureg.get_dimensionality(unit)
             if len(unit_dimensionality) > 1:
                 msg = (
@@ -201,27 +206,25 @@ def coords_to_transforms(
                     'which cannot be mapped to a single axis type. "type" will be '
                     'set to "None" for this axis.',
                 )
-                warnings.warn(
-                    RuntimeWarning,
-                )
+                warnings.warn(msg, stacklevel=1)
             if "[length]" in unit_dimensionality:
-                type = "space"
+                axis_type = "space"
             elif "[time]" in unit_dimensionality:
-                type = "time"
+                axis_type = "time"
             else:
                 msg = (
                     f'Failed to infer the type of axis with unit = "{unit}", '
                     "because it could not be mapped to either a time or space "
                     'dimension. "type" will be set to None for this axis.'
                 )
-                warnings.warn(msg, RuntimeWarning)
-                type = None
+                warnings.warn(msg, stacklevel=1)
+                axis_type = None
 
         axes.append(
             Axis(
                 name=dim,
                 unit=unit,
-                type=type,
+                type=axis_type,
             )
         )
 
@@ -233,8 +236,8 @@ def coords_to_transforms(
 
 
 def transforms_to_coords(
-    axes: List[Axis], transforms: List[CoordinateTransform], shape: Tuple[int, ...]
-) -> List[DataArray]:
+    axes: list[Axis], transforms: list[CoordinateTransform], shape: tuple[int, ...]
+) -> list[DataArray]:
     """
     Given an output shape, convert a sequence of Axis objects and a corresponding
     sequence of coordinateTransform objects into xarray-compatible coordinates.
@@ -255,13 +258,13 @@ def transforms_to_coords(
         unit = axis.unit
         # apply transforms in order
         for tx in transforms:
-            if type(getattr(tx, "path", None)) == str:
+            if isinstance(getattr(tx, "path", None), str):
                 msg = (
                     f"Problematic transform: {tx}. This library cannot handle "
                     "transforms with paths. Resolve this path to a literal scale or "
-                    "translation"
+                    "translation."
                 )
-                raise ValueError(msg)
+                raise TypeError(msg)
 
             if tx.type == "translation":
                 if len(tx.translation) != len(axes):

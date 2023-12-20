@@ -1,4 +1,7 @@
-from typing import NamedTuple, Callable, Any
+from __future__ import annotations
+
+from typing import Any, Callable, NamedTuple
+
 from xarray_ome_ngff.core import ngff_versions
 
 
@@ -12,9 +15,9 @@ class MetadataAdapters(NamedTuple):
 def get_adapters(version: str):
     if version == "0.4":
         from xarray_ome_ngff.v04.multiscales import (
+            coords_to_transforms,
             multiscale_metadata,
             transforms_to_coords,
-            coords_to_transforms,
         )
 
         return MetadataAdapters(
@@ -24,11 +27,11 @@ def get_adapters(version: str):
             coords_to_transforms=coords_to_transforms,
         )
 
-    elif version == "0.5-dev" or version == "latest":
+    if version in ("0.5-dev", "latest"):
         from xarray_ome_ngff.latest.multiscales import (
+            coords_to_transforms,
             multiscale_metadata,
             transforms_to_coords,
-            coords_to_transforms,
         )
 
         return MetadataAdapters(
@@ -38,10 +41,5 @@ def get_adapters(version: str):
             coords_to_transforms=coords_to_transforms,
         )
 
-    else:
-        raise ValueError(
-            f"""
-                Got version={version}, but this is not one of the supported versions:
-                {ngff_versions}
-                    """
-        )
+    msg = f"Got version={version}, but this is not one of the supported versions: {ngff_versions}"
+    raise TypeError(msg)

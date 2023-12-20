@@ -1,25 +1,86 @@
-[tool.poetry]
-name = "xarray-ome-ngff"
-version = "1.2.3"
-description = "xarray and ome-ngff"
-authors = ["Davis Vann Bennett <davis.v.bennett@gmail.com>"]
-readme = "README.md"
-packages = [{include = "xarray_ome_ngff", from="src"}]
-
-[tool.poetry.dependencies]
-python = "^3.9"
-xarray = "^2023.2.0"
-pydantic-ome-ngff = "^0.3.0"
-pint = "^0.20.1"
-pydantic = "^1.10.7"
-
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.2.1"
-pre-commit = "^3.0.4"
-mypy = "^1.1.1"
-pytest-cov = "^4.0.0"
-
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "xarray-ome-ngff"
+dynamic = ["version"]
+description = 'xarray and ome-ngff'
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+keywords = []
+authors = [
+  { name = "Davis Vann Bennett", email = "davis.v.bennett@gmail.com" },
+]
+
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = [
+    "xarray>=2022.0.0",
+    "pint>0.21",
+    "pydantic-ome-ngff>=0.3.0"
+    ]
+
+[project.urls]
+Documentation = "https://github.com/janeliascicomp/xarray-ome-ngff#readme"
+Issues = "https://github.com/janeliascicomp/xarray-ome-ngff/issues"
+Source = "https://github.com/janeliascicomp/xarray-ome-ngff"
+
+[tool.hatch]
+version.source = "vcs"
+build.hooks.vcs.version-file = "src/xarray_ome_ngff/version.py"
+
+[tool.hatch.envs.default]
+dependencies = [
+  "coverage[toml]>=6.5",
+  "pytest",
+]
+[tool.hatch.envs.default.scripts]
+test = "pytest {args:tests}"
+test-cov = "coverage run -m pytest {args:tests}"
+cov-report = [
+  "- coverage combine",
+  "coverage report",
+]
+cov = [
+  "test-cov",
+  "cov-report",
+]
+
+[[tool.hatch.envs.all.matrix]]
+python = ["3.9", "3.10", "3.11", "3.12"]
+
+[tool.hatch.envs.types]
+dependencies = [
+  "mypy>=1.0.0",
+]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/xarray_ome_ngff tests}"
+
+[tool.coverage.run]
+source_pkgs = ["xarray_ome_ngff", "tests"]
+branch = true
+parallel = true
+omit = [
+  "src/xarray_ome_ngff/version.py",
+]
+
+[tool.coverage.paths]
+xarray_ome_ngff = ["src/xarray_ome_ngff", "*/xarray-ome-ngff/src/xarray_ome_ngff"]
+tests = ["tests", "*/xarray-ome-ngff/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]

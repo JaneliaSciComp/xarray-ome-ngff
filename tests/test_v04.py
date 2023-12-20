@@ -1,19 +1,22 @@
-from xarray import DataArray
+from __future__ import annotations
+
+from typing import Any
+
 import numpy as np
-from typing import Tuple, Optional, Any
+import pint
+from pydantic_ome_ngff.v04.axes import Axis
+from pydantic_ome_ngff.v04.coordinateTransformations import (
+    VectorScaleTransform,
+    VectorTranslationTransform,
+)
+from pydantic_ome_ngff.v04.multiscales import Multiscale, MultiscaleDataset
+from xarray import DataArray
+
 from xarray_ome_ngff.v04.multiscales import (
     coords_to_transforms,
     multiscale_metadata,
     transforms_to_coords,
 )
-
-from pydantic_ome_ngff.v04.axes import Axis
-from pydantic_ome_ngff.v04.multiscales import Multiscale, MultiscaleDataset
-from pydantic_ome_ngff.v04.coordinateTransformations import (
-    VectorScaleTransform,
-    VectorTranslationTransform,
-)
-import pint
 
 ureg = pint.UnitRegistry()
 
@@ -21,25 +24,25 @@ ureg = pint.UnitRegistry()
 def create_coord(
     shape: int,
     dim: str,
-    unit: Optional[str],
-    type: Optional[str],
+    unit: str | None,
+    axis_type: str | None,
     scale: float,
     translate: float,
 ):
     return DataArray(
         (np.arange(shape) * scale) + translate,
         dims=(dim,),
-        attrs={"unit": unit, "type": type},
+        attrs={"unit": unit, "type": axis_type},
     )
 
 
 def create_array(
-    shape: Tuple[int, ...],
-    dims: Tuple[str, ...],
-    units: Tuple[Optional[str], ...],
-    types: Tuple[Optional[str], ...],
-    scale: Tuple[float, ...],
-    translate: Tuple[float, ...],
+    shape: tuple[int, ...],
+    dims: tuple[str, ...],
+    units: tuple[str | None, ...],
+    types: tuple[str | None, ...],
+    scale: tuple[float, ...],
+    translate: tuple[float, ...],
     **kwargs: Any,
 ):
     """
@@ -52,7 +55,7 @@ def create_array(
     ):
         coords.append(
             create_coord(
-                shape=shp, dim=dim, unit=unit, type=typ, scale=scle, translate=trns
+                shape=shp, dim=dim, unit=unit, axis_type=typ, scale=scle, translate=trns
             )
         )
 
