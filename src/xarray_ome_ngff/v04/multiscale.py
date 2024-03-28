@@ -1,12 +1,16 @@
-from typing import Any, Dict, List, Sequence, Tuple, Optional
+from __future__ import annotations
+from pydantic_ome_ngff.v04.multiscale import Group
+from typing import TYPE_CHECKING, Mapping
+
+if TYPE_CHECKING:
+    from typing import Any, Dict, List, Sequence, Literal
 import numpy as np
 from xarray import DataArray
-from pydantic_ome_ngff.latest.axes import Axis
-from pydantic_ome_ngff.latest.multiscales import MultiscaleDataset, Multiscale
-from pydantic_ome_ngff.latest.coordinateTransformations import (
-    VectorScaleTransform,
-    VectorTranslationTransform,
-    CoordinateTransform,
+from pydantic_ome_ngff.v04.axis import Axis
+from pydantic_ome_ngff.v04.multiscale import Dataset, MultiscaleMetadata
+from pydantic_ome_ngff.v04.transform import (
+    VectorScale,
+    VectorTranslation,
 )
 import builtins
 import warnings
@@ -15,13 +19,13 @@ from xarray_ome_ngff.core import ureg
 
 def multiscale_metadata(
     arrays: Sequence[DataArray],
-    array_paths: Optional[List[str]] = None,
-    name: Optional[str] = None,
-    type: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None,
+    array_paths: Sequence[str] | None = None,
+    name: str | None = None,
+    type: str | None = None,
+    metadata: Dict[str, Any] | None = None,
     normalize_units: bool = True,
     infer_axis_type: bool = True,
-) -> Multiscale:
+) -> MultiscaleMetadata:
     """
     Create Multiscale metadata from a collection of xarray.DataArrays
 
@@ -64,7 +68,7 @@ def multiscale_metadata(
     for arr in arrays:
         if not isinstance(arr, DataArray):
             msg = (
-                "This function requires a list of xarray.DataArrays. Got an element "
+                "This function requires a sequence of xarray.DataArrays. Got an element "
                 f"with type = '{builtins.type(arr)}' instead."
             )
             raise ValueError(msg)
@@ -77,8 +81,9 @@ def multiscale_metadata(
         )
         raise ValueError(msg)
     arrays_sorted = tuple(reversed(sorted(arrays, key=lambda arr: np.prod(arr.shape))))
+
     base_transforms = [
-        VectorScaleTransform(
+        VectorScale(
             scale=[
                 1,
             ]
@@ -98,7 +103,7 @@ def multiscale_metadata(
         )
     )
     if array_paths is None:
-        paths = [d.name for d in arrays_sorted]
+        paths = [str(d.name) for d in arrays_sorted]
     else:
         assert len(array_paths) == len(
             arrays
@@ -106,10 +111,9 @@ def multiscale_metadata(
         paths = array_paths
 
     datasets = list(
-        MultiscaleDataset(path=p, coordinateTransformations=t)
-        for p, t in zip(paths, transforms)
+        Dataset(path=p, coordinateTransformations=t) for p, t in zip(paths, transforms)
     )
-    return Multiscale(
+    return MultiscaleMetadata(
         name=name,
         type=type,
         axes=axes[0],
@@ -120,8 +124,8 @@ def multiscale_metadata(
 
 
 def coords_to_transforms(
-    coords: Tuple[DataArray, ...], normalize_units: bool = True, infer_axis_type=True
-) -> Tuple[Tuple[Axis, ...], Tuple[VectorScaleTransform, VectorTranslationTransform]]:
+    coords: tuple[DataArray, ...], normalize_units: bool = True, infer_axis_type=True
+) -> tuple[tuple[Axis, ...], tuple[VectorScale, VectorTranslation]]:
     """
     Generate Axes and CoordinateTransformations from an xarray.DataArray.
 
@@ -167,37 +171,22 @@ def coords_to_transforms(
             raise ValueError(msg)
         dim = coord.dims[0]
         translate.append(float(coord[0]))
-        # impossible to infer a scale coordinate from a coordinate with 1 sample
+
+        # impossible to infer a scale coordinate from a coordinate with 1 sample, so it defaults
+        # to 1
         if len(coord) > 1:
             scale.append(abs(float(coord[1]) - float(coord[0])))
         else:
             scale.append(1)
-        unit = coord.attrs.get("unit", None)
         units = coord.attrs.get("units", None)
-        if unit is None and units is not None:
-            msg = (
-                "The key 'unit' was unset, but 'units' was found in array attrs, "
-                f"with a value of \"{units}\". The 'unit' property of the "
-                f'corresponding axis will be set to "{units}", but this behavior '
-                "may change in the future."
-            )
-            warnings.warn(msg)
-            unit = units
-        elif units is not None:
-            msg = (
-                'Both "unit" and "units" were found in array attrs, with values '
-                f'"{unit}" and "{units}", respectively. The value associated '
-                f'with "unit" ({unit}) will be used in the axis metadata.'
-            )
-            warnings.warn(msg)
-        if normalize_units and unit is not None:
-            unit = ureg.get_name(unit, case_sensitive=True)
+        if normalize_units and units is not None:
+            units = ureg.get_name(units, case_sensitive=True)
         if (type := coord.attrs.get("type", None)) is None and infer_axis_type:
-            unit_dimensionality = ureg.get_dimensionality(unit)
+            unit_dimensionality = ureg.get_dimensionality(units)
             if len(unit_dimensionality) > 1:
                 msg = (
-                    f'Failed to infer the type of axis with unit = "{unit}"',
-                    f'because it appears that unit "{unit}" is a compound unit, '
+                    f'Failed to infer the type of axis with unit = "{units}"',
+                    f'because it appears that unit "{units}" is a compound unit, '
                     'which cannot be mapped to a single axis type. "type" will be '
                     'set to "None" for this axis.',
                 )
@@ -210,7 +199,7 @@ def coords_to_transforms(
                 type = "time"
             else:
                 msg = (
-                    f'Failed to infer the type of axis with unit = "{unit}", '
+                    f'Failed to infer the type of axis with unit = "{units}", '
                     "because it could not be mapped to either a time or space "
                     'dimension. "type" will be set to None for this axis.'
                 )
@@ -220,20 +209,22 @@ def coords_to_transforms(
         axes.append(
             Axis(
                 name=dim,
-                unit=unit,
+                unit=units,
                 type=type,
             )
         )
 
     transforms = (
-        VectorScaleTransform(scale=scale),
-        VectorTranslationTransform(translation=translate),
+        VectorScale(scale=scale),
+        VectorTranslation(translation=translate),
     )
     return axes, transforms
 
 
 def transforms_to_coords(
-    axes: List[Axis], transforms: List[CoordinateTransform], shape: Tuple[int, ...]
+    axes: List[Axis],
+    transforms: Sequence[tuple[VectorScale] | tuple[VectorScale, VectorTranslation]],
+    shape: tuple[int, ...],
 ) -> List[DataArray]:
     """
     Given an output shape, convert a sequence of Axis objects and a corresponding
@@ -255,7 +246,7 @@ def transforms_to_coords(
         unit = axis.unit
         # apply transforms in order
         for tx in transforms:
-            if type(getattr(tx, "path", None)) == str:
+            if isinstance(getattr(tx, "path", None), str):
                 msg = (
                     f"Problematic transform: {tx}. This library cannot handle "
                     "transforms with paths. Resolve this path to a literal scale or "
@@ -291,9 +282,95 @@ def transforms_to_coords(
         result.append(
             DataArray(
                 base_coord,
-                attrs={"unit": unit},
+                attrs={"units": unit},
                 dims=(name,),
             )
         )
 
     return result
+
+
+def multiscale_from_arrays(
+    arrays: dict[str, DataArray] | Sequence[DataArray],
+    paths: Literal["auto"] | Sequence[str],
+):
+    """
+    Create a model of an OME-NGFF multiscale group from a collection of `xarray.DataArray`.
+    The dimensions / coordinates of the arrays will be used to infer OME-NGFF axis metadata, as well
+    as the OME-NGFF coordinate transformation metadata (i.e., scaling and translation).
+    """
+    arrays_sorted = tuple(reversed(sorted(arrays, key=lambda arr: np.prod(arr.shape))))
+    # pluralses of plurals
+    axeses, transformses = tuple(
+        zip(*(coords_to_transforms(a.coords) for a in arrays_sorted))
+    )
+
+    if len(set(axeses)) != 1:
+        raise ValueError(
+            f"Got {len(set(axeses))} unique axes from `arrays`",
+            "which suggests means that their dimensions and / or coordinates are incompatible.",
+        )
+
+    group = Group.from_arrays(
+        arrays,
+        paths,
+        axes=axeses[0],
+        scales=[s.scale for s in transformses[0]],
+        translations=[t.translation for t in transformses[1]],
+    )
+    return group
+
+
+def arrays_from_multiscale(): ...
+
+
+def normalize_paths(
+    paths: Literal["auto"] | Sequence[str],
+    arrays: Sequence[DataArray] | dict[str, DataArray],
+) -> tuple[tuple[str, DataArray], ...]:
+    """
+    Normalize the `paths` argument against a sequence of `xarray.DataArray`.
+    If `paths` is the string "auto", there are two possibilities:
+    - if `arrays` is a `dict`, then the keys of that dict will be validated and returned.
+    - if `arrays` is a `Sequence[DataArray]`, then the `name` attribute of each array will be
+    validated and returned.
+    Otherwise, `paths` is validated and zipped with `arrays` to return a `tuple` of `tuple`, where the
+    inner `tuple` are pairs of corresponding `path`, `array` instances.
+
+    Validation entails checking that each element is a string, and that each element appears once.
+
+    Parameters
+    ----------
+    paths: Literal["auto"] | Sequence[str]
+        A specification of the paths of the arrays. Either the string "auto", in which case
+        a tuple of strings will be inferred from the `arrays` argument, or a sequence of strings.
+    arrays: Sequence[DataArray] | dict[str, DataArray]
+        Instances of `xarray.DataArray`, either in a `dict` or a `Sequence`.
+
+    Returns
+    -------
+    `tuple[tuple[str, xarray.DataArray]]`
+        A tuple of array path : array pairs.
+    """
+    if paths == "auto":
+        if isinstance(arrays, Mapping):
+            paths_out = tuple(arrays.keys())
+        else:
+            paths_out = tuple(a.name for a in arrays)
+    else:
+        if len(paths_out) != len(arrays):
+            msg = f"Length of paths ({len(paths)}) does not match length of arrays ({len(arrays)})."
+            raise ValueError(msg)
+        paths_out = paths
+
+    for path in paths_out:
+        if not isinstance(path, str):
+            msg = f"Got a non-string path: {path}. Expected a string."
+            raise TypeError(msg)
+        if paths.count(path) != 1:
+            msg = (
+                f"An element of paths is repeated: {path}. ",
+                "All elements of paths must be unique.",
+            )
+
+    return tuple(zip(paths_out, arrays))

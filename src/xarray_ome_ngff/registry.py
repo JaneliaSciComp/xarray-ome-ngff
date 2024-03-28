@@ -11,7 +11,7 @@ class MetadataAdapters(NamedTuple):
 
 def get_adapters(version: str):
     if version == "0.4":
-        from xarray_ome_ngff.v04.multiscales import (
+        from xarray_ome_ngff.v04.multiscale import (
             multiscale_metadata,
             transforms_to_coords,
             coords_to_transforms,
@@ -23,25 +23,9 @@ def get_adapters(version: str):
             transforms_to_coords=transforms_to_coords,
             coords_to_transforms=coords_to_transforms,
         )
-
-    elif version == "0.5-dev" or version == "latest":
-        from xarray_ome_ngff.latest.multiscales import (
-            multiscale_metadata,
-            transforms_to_coords,
-            coords_to_transforms,
-        )
-
-        return MetadataAdapters(
-            ngff_version="0.5-dev",
-            multiscale_metadata=multiscale_metadata,
-            transforms_to_coords=transforms_to_coords,
-            coords_to_transforms=coords_to_transforms,
-        )
-
     else:
-        raise ValueError(
-            f"""
-                Got version={version}, but this is not one of the supported versions:
-                {ngff_versions}
-                    """
+        msg = (
+            f"Got version={version}, but this is not one of the supported versions:"
+            f"{ngff_versions}"
         )
+        raise ValueError(msg)
