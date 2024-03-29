@@ -1,7 +1,7 @@
 # xarray-ome-ngff
 Integration between xarray and the ome-ngff data model.
 
-At present (February, 2023) this is a partial implementation of the [OME-NGFF spec](https://ngff.openmicroscopy.org/latest/#implementations). Specifcally, *only* the [`multiscales`](https://ngff.openmicroscopy.org/latest/#multiscale-md) and specs required by `multiscales` are implemented. Complete support for the spec would be welcome.
+At present (February, 2023) this is a partial implementation of the [OME-NGFF spec](https://ngff.openmicroscopy.org/latest/#implementations). Specifically, *only* the [`multiscales`](https://ngff.openmicroscopy.org/latest/#multiscale-md) and specs required by `multiscales` are implemented. Complete support for the spec would be welcome.
 
 ## How it works
 This library depends on [`pydantic-ome-ngff`](https://github.com/JaneliaSciComp/pydantic-ome-ngff) which implements OME-NGFF metadata as [pydantic](https://docs.pydantic.dev/) models. 

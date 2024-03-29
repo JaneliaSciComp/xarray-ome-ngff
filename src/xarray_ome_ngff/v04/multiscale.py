@@ -1,9 +1,11 @@
 from __future__ import annotations
+from dataclasses import dataclass
+from pydantic import BaseModel
 from pydantic_ome_ngff.v04.multiscale import Group
-from typing import TYPE_CHECKING, Mapping
+from typing import TYPE_CHECKING, cast, runtime_checkable, Optional
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Sequence, Literal
+    from typing import Any, Dict, List, Sequence, Literal, Optional
 import numpy as np
 from xarray import DataArray
 from pydantic_ome_ngff.v04.axis import Axis
@@ -12,14 +14,25 @@ from pydantic_ome_ngff.v04.transform import (
     VectorScale,
     VectorTranslation,
 )
-import builtins
 import warnings
 from xarray_ome_ngff.core import ureg
+import zarr
+from zarr.storage import BaseStore
+import dask.array as da
+from typing import TypedDict
+import os
+
+
+class CoordinateAttrs(BaseModel):
+    """
+    A model of the attributes of a DataArray coordinate
+    """
+
+    units: Optional[str]
 
 
 def multiscale_metadata(
-    arrays: Sequence[DataArray],
-    array_paths: Sequence[str] | None = None,
+    arrays: dict[str, DataArray],
     name: str | None = None,
     type: str | None = None,
     metadata: Dict[str, Any] | None = None,
@@ -27,32 +40,26 @@ def multiscale_metadata(
     infer_axis_type: bool = True,
 ) -> MultiscaleMetadata:
     """
-    Create Multiscale metadata from a collection of xarray.DataArrays
+    Create Multiscale metadata from a dict of xarray.DataArrays
 
     Parameters
     ----------
 
-    arrays: sequence of DataArray
-        The arrays that represent the multiscale collection of images.
-
-    array_paths: sequence of strings, optional
-        The path of each array in the group.
-
+    arrays: dict[str, DataArray]
+        The values of this `dict` are `xarray.DataArray` instances that each represent a separate
+        scale level of a multiscale pyramid.
+        The keys of this dict paths for each array in the Zarr hierarchy.
     name: string, optional
         The name of the multiscale collection. Used to populate the 'name' field of
         Multiscale metadata.
-
     type: string, optional
         The type of the multiscale collection. Used to populate the 'type' field of
         Multiscale metadata.
-
     metadata: dict, optional
         Additional metadata associated with this multiscale collection. Used to populate
         the 'metadata' field of Multiscale metadata.
-
     normalize_units: bool, defaults to True
         Whether to normalize units to standard names, e.g. 'nm' -> 'nanometer'
-
     infer_axis_type: bool, defaults to True
         Whether to infer the `type` field of the axis from units, e.g. if units are
         "nanometer" then the type of the axis can safely be assumed to be "space".
@@ -61,40 +68,19 @@ def multiscale_metadata(
 
     Returns
     -------
-
-    An instance of Multiscale metadata.
+    `MultiscaleMetadata`
 
     """
-    for arr in arrays:
-        if not isinstance(arr, DataArray):
-            msg = (
-                "This function requires a sequence of xarray.DataArrays. Got an element "
-                f"with type = '{builtins.type(arr)}' instead."
-            )
-            raise ValueError(msg)
-    # sort arrays by decreasing shape
-    ndims = [a.ndim for a in arrays]
-    if len(set(ndims)) > 1:
-        msg = (
-            "All arrays must have the same number of dimensions. Found arrays with "
-            f"different numbers of dimensions: {set(ndims)}."
-        )
-        raise ValueError(msg)
-    arrays_sorted = tuple(reversed(sorted(arrays, key=lambda arr: np.prod(arr.shape))))
+    arrays_sorted = tuple(
+        sorted(arrays.values(), key=lambda arr: np.prod(arr.shape), reverse=True)
+    )
+    ndims = tuple(a.ndim for a in arrays_sorted)
 
-    base_transforms = [
-        VectorScale(
-            scale=[
-                1,
-            ]
-            * ndims[0]
-        )
-    ]
     axes, transforms = tuple(
         zip(
             *(
-                coords_to_transforms(
-                    tuple(array.coords.values()),
+                transforms_from_coords(
+                    array.coords,
                     normalize_units=normalize_units,
                     infer_axis_type=infer_axis_type,
                 )
@@ -102,29 +88,23 @@ def multiscale_metadata(
             )
         )
     )
-    if array_paths is None:
-        paths = [str(d.name) for d in arrays_sorted]
-    else:
-        assert len(array_paths) == len(
-            arrays
-        ), f"Length of array_paths {len(array_paths)} doesn't match {len(arrays)}"
-        paths = array_paths
 
     datasets = list(
-        Dataset(path=p, coordinateTransformations=t) for p, t in zip(paths, transforms)
+        Dataset(path=p, coordinateTransformations=t)
+        for p, t in zip(arrays.keys(), transforms)
     )
+
     return MultiscaleMetadata(
         name=name,
         type=type,
         axes=axes[0],
         datasets=datasets,
         metadata=metadata,
-        coordinateTransformations=base_transforms,
     )
 
 
-def coords_to_transforms(
-    coords: tuple[DataArray, ...], normalize_units: bool = True, infer_axis_type=True
+def transforms_from_coords(
+    coords: dict[str, DataArray], normalize_units: bool = True, infer_axis_type=True
 ) -> tuple[tuple[Axis, ...], tuple[VectorScale, VectorTranslation]]:
     """
     Generate Axes and CoordinateTransformations from an xarray.DataArray.
@@ -152,32 +132,37 @@ def coords_to_transforms(
 
     Returns
     -------
-        A tuple with two elements. The first value is a tuple of Axis objects with
-        length equal to the number of dimensions of the input array. The second value is
-        a tuple with two elements which contains a VectorScaleTransform and a
-        VectorTranslationTransform, both of which are derived by inspecting the
-        coordinates of the input array.
+        A tuple with 2 elements. The first element is a tuple of `Axis` objects, one per dimension;
+        the second element it itself a tuple with two elements, the first element of which is
+        a VectorScaleTransform and the second element is a VectorTranslationTransform.
+        Both transformations are are derived from the coordinates of the input array.
     """
 
-    translate = []
-    scale = []
-    axes = []
-    for coord in coords:
+    translate = ()
+    scale = ()
+    axes = ()
+
+    for dim, coord in coords.items():
         if ndim := len(coord.dims) != 1:
             msg = (
                 "Each coordinate must have one and only one dimension. "
                 f"Got a coordinate with {ndim}."
             )
             raise ValueError(msg)
-        dim = coord.dims[0]
-        translate.append(float(coord[0]))
+        if coord.dims != (dim,):
+            msg = (
+                f"Coordinate {dim} corresponds to multiple dimensions ({coord.dims}). "
+                "This is incompatible with the OME-NGFF model."
+            )
+            raise ValueError()
+        translate += (float(coord[0]),)
 
         # impossible to infer a scale coordinate from a coordinate with 1 sample, so it defaults
         # to 1
         if len(coord) > 1:
-            scale.append(abs(float(coord[1]) - float(coord[0])))
+            scale += (abs(float(coord[1]) - float(coord[0])),)
         else:
-            scale.append(1)
+            scale += (1,)
         units = coord.attrs.get("units", None)
         if normalize_units and units is not None:
             units = ureg.get_name(units, case_sensitive=True)
@@ -197,21 +182,13 @@ def coords_to_transforms(
                 type = "space"
             elif "[time]" in unit_dimensionality:
                 type = "time"
-            else:
-                msg = (
-                    f'Failed to infer the type of axis with unit = "{units}", '
-                    "because it could not be mapped to either a time or space "
-                    'dimension. "type" will be set to None for this axis.'
-                )
-                warnings.warn(msg, RuntimeWarning)
-                type = None
 
-        axes.append(
+        axes += (
             Axis(
                 name=dim,
                 unit=units,
                 type=type,
-            )
+            ),
         )
 
     transforms = (
@@ -221,11 +198,11 @@ def coords_to_transforms(
     return axes, transforms
 
 
-def transforms_to_coords(
-    axes: List[Axis],
+def coords_from_transforms(
+    axes: Sequence[Axis],
     transforms: Sequence[tuple[VectorScale] | tuple[VectorScale, VectorTranslation]],
     shape: tuple[int, ...],
-) -> List[DataArray]:
+) -> tuple[DataArray]:
     """
     Given an output shape, convert a sequence of Axis objects and a corresponding
     sequence of coordinateTransform objects into xarray-compatible coordinates.
@@ -282,95 +259,282 @@ def transforms_to_coords(
         result.append(
             DataArray(
                 base_coord,
-                attrs={"units": unit},
+                attrs=CoordinateAttrs(units=unit).model_dump(),
                 dims=(name,),
             )
         )
 
-    return result
+    return tuple(result)
 
 
-def multiscale_from_arrays(
-    arrays: dict[str, DataArray] | Sequence[DataArray],
-    paths: Literal["auto"] | Sequence[str],
-):
+def fuse_scale_tx(scales: Sequence[VectorScale]) -> VectorScale:
+    scale_out = np.ones(len(scales[0].scale))
+    for scale in scales:
+        scale_out *= scale.scale
+    return VectorScale(scale=scale_out)
+
+
+def fuse_trans_tx(translations: Sequence[VectorTranslation]) -> VectorTranslation:
+    trans_out = np.zeros(len(translations[0].translation))
+    for trans in translations:
+        trans_out += trans.translation
+    return VectorTranslation(translation=trans_out)
+
+
+def normalize_tx(
+    tx: tuple[VectorScale] | tuple[VectorScale, VectorTranslation]
+) -> tuple[VectorScale, VectorTranslation]:
     """
-    Create a model of an OME-NGFF multiscale group from a collection of `xarray.DataArray`.
+    Normalize `coordinateTransformations` metadata to expanded form.
+    """
+    if len(tx) == 1:
+        return (tx[0], VectorTranslation(translation=(1,) * len(tx[0].scale)))
+    return tx
+
+
+def normalize_base_tx(
+    transforms: (
+        None | tuple[()] | tuple[VectorScale] | tuple[VectorScale, VectorTranslation]
+    ),
+    ndim: int,
+):
+    if transforms is None or len(transforms) == 0:
+        scale = VectorScale(scale=(1,) * ndim)
+        trans = VectorTranslation(translation=(0,) * ndim)
+    elif len(transforms) == 1:
+        scale = transforms[0]
+        trans = VectorTranslation(translation=(0,) * ndim)
+    else:
+        scale, trans = transforms
+    return scale, trans
+
+
+def model_group(
+    arrays: dict[str, DataArray],
+) -> Group:
+    """
+    Create a model of an OME-NGFF multiscale group from a dict of `xarray.DataArray`.
     The dimensions / coordinates of the arrays will be used to infer OME-NGFF axis metadata, as well
     as the OME-NGFF coordinate transformation metadata (i.e., scaling and translation).
     """
-    arrays_sorted = tuple(reversed(sorted(arrays, key=lambda arr: np.prod(arr.shape))))
+
     # pluralses of plurals
     axeses, transformses = tuple(
-        zip(*(coords_to_transforms(a.coords) for a in arrays_sorted))
+        zip(*(transforms_from_coords(a.coords) for a in arrays.values()))
     )
-
-    if len(set(axeses)) != 1:
-        raise ValueError(
-            f"Got {len(set(axeses))} unique axes from `arrays`",
-            "which suggests means that their dimensions and / or coordinates are incompatible.",
-        )
+    scales, translations = zip(*transformses)
+    # requires a fix upstream to make models hashable
+    # if len(set(axeses)) != 1:
+    #    raise ValueError(
+    #        f"Got {len(set(axeses))} unique axes from `arrays`",
+    #        "which suggests means that their dimensions and / or coordinates are incompatible.",
+    #    )
 
     group = Group.from_arrays(
-        arrays,
-        paths,
+        arrays=arrays.values(),
+        paths=arrays.keys(),
         axes=axeses[0],
-        scales=[s.scale for s in transformses[0]],
-        translations=[t.translation for t in transformses[1]],
+        scales=[s.scale for s in scales],
+        translations=[t.translation for t in translations],
     )
     return group
 
 
-def arrays_from_multiscale(): ...
-
-
-def normalize_paths(
-    paths: Literal["auto"] | Sequence[str],
-    arrays: Sequence[DataArray] | dict[str, DataArray],
-) -> tuple[tuple[str, DataArray], ...]:
+def create_group(store: BaseStore, path: str, arrays: dict[str, DataArray]):
     """
-    Normalize the `paths` argument against a sequence of `xarray.DataArray`.
-    If `paths` is the string "auto", there are two possibilities:
-    - if `arrays` is a `dict`, then the keys of that dict will be validated and returned.
-    - if `arrays` is a `Sequence[DataArray]`, then the `name` attribute of each array will be
-    validated and returned.
-    Otherwise, `paths` is validated and zipped with `arrays` to return a `tuple` of `tuple`, where the
-    inner `tuple` are pairs of corresponding `path`, `array` instances.
+    Create Zarr group that complies with 0.4 of the OME-NGFF multiscale specification from a dict
+    of `xarray.DataArray`.
+    """
 
-    Validation entails checking that each element is a string, and that each element appears once.
+    model = model_group(arrays)
+    return model.to_zarr(store, path)
+
+
+from abc import ABC, abstractmethod
+
+from typing import Protocol
+from typing_extensions import Self
+
+
+@runtime_checkable
+class Arrayish(Protocol):
+    dtype: np.dtype
+    shape: tuple[int, ...]
+
+    def __getitem__(self, *args) -> Self: ...
+class ArrayWrapperSpec(TypedDict):
+    name: Literal["dask"]
+    config: dict[str, Any]
+
+
+class DaskArrayWrapperConfig(TypedDict):
+    chunks: str | int | tuple[int, ...] | tuple[tuple[int, ...], ...]
+    meta: Any = None
+    inline_array: bool
+
+
+class ZarrArrayWrapperSpec(ArrayWrapperSpec):
+    name: Literal["zarr_array"]
+    config: dict[str, Any] = {}
+
+
+class DaskArrayWrapperSpec(ArrayWrapperSpec):
+    name: Literal["dask_array"]
+    config: DaskArrayWrapperConfig
+
+
+class BaseArrayWrapper(ABC):
+    @abstractmethod
+    def wrap(self, data: zarr.Array) -> Arrayish: ...
+
+
+@dataclass
+class ZarrArrayWrapper(BaseArrayWrapper):
+    """
+    An array wrapper that passes `zarr.Array` instances through unchanged.
+    """
+
+    def wrap(self, data: zarr.Array) -> Arrayish:
+        return data
+
+
+@dataclass
+class DaskArrayWrapper(BaseArrayWrapper):
+    """
+    An array wrapper that wraps `zarr.Array` in a dask array using `dask.array.from_array`.
+    """
+
+    chunks: str | int | tuple[int, ...] | tuple[tuple[int, ...], ...] = "auto"
+    meta: Any = None
+    inline_array: bool = True
+
+    def wrap(self, data: zarr.Array):
+        return da.from_array(data, chunks=self.chunks, inline_array=self.inline_array)
+
+
+def parse_wrapper(data: ArrayWrapperSpec | BaseArrayWrapper):
+    """
+    Parse the input into a `BaseArrayWrapper` subclass. If the input is already
+    `BaseArrayWrapper`, it gets returned unchanged. Otherwise, the input is presumed to be
+    `ArrayWrapperSpec` and is passed to `resolve_wrapper`.
+    """
+    if isinstance(data, BaseArrayWrapper):
+        return data
+    return resolve_wrapper(data)
+
+
+def resolve_wrapper(spec: ArrayWrapperSpec) -> BaseArrayWrapper:
+    """
+    Convert an `ArrayWrapperSpec` into the corresponding `BaseArrayWrapper` subclass.
+    """
+    if spec["name"] == "dask_array":
+        spec = cast(DaskArrayWrapperConfig, spec)
+        return DaskArrayWrapper(**spec["config"])
+    elif spec["name"] == "zarr_array":
+        spec = cast(ZarrArrayWrapperSpec, spec)
+        return ZarrArrayWrapper(**spec["config"])
+    else:
+        raise ValueError(f"Spec {spec} is not recognized.")
+
+
+def read_group(
+    group: zarr.Group,
+    *,
+    array_wrapper: BaseArrayWrapper | ArrayWrapperSpec = ZarrArrayWrapper(),
+    multiscales_index: int = 0,
+) -> dict[str, DataArray]:
+    """
+    Create a dict of `xarray.DataArray` from a Zarr group that implements version 0.4 of the
+    OME-NGFF multiscale image specification.
+
+    The keys of the `dict` are the paths to the Zarr arrays. The values of the `dict` are
+    `xarray.DataArray` objects, one per Zarr array described in the OME-NGFF multiscale metadata,
+    with dimensions and coordinates that are consistent with the OME-NGFF `Axes` and
+    `coordinateTransformations` metadata.
 
     Parameters
     ----------
-    paths: Literal["auto"] | Sequence[str]
-        A specification of the paths of the arrays. Either the string "auto", in which case
-        a tuple of strings will be inferred from the `arrays` argument, or a sequence of strings.
-    arrays: Sequence[DataArray] | dict[str, DataArray]
-        Instances of `xarray.DataArray`, either in a `dict` or a `Sequence`.
-
-    Returns
-    -------
-    `tuple[tuple[str, xarray.DataArray]]`
-        A tuple of array path : array pairs.
+    group: `zarr.Group`
+        A handle for the Zarr group that contains the `multiscales` metadata.
+    array_wrapper: `BaseArrayWrapper` | `ArrayWrapperSpec`, default = `ZarrArrayWrapper()`
+        Either an object that implements `BaseArrayWrapper`, or a dict model of such a subclass,
+        which will be resolved to an object implementing `BaseArrayWrapper`. This object has a
+        `wrap` method that takes an instance of `zarr.Array` and returns another array-like object.
+        This enables wrapping Zarr arrays in a lazy array representation like Dask arrays
+        (e.g., via `DaskArrayWrapper), which is necessary when working with large Zarr arrays.
+    multiscales_index: `int`, default = 0
+        Version 0.4 of the OME-NGFF multiscales spec states that multiscale
+        metadata is stored in a JSON array within Zarr group attributes.
+        This parameter determines which element from that array to use when defining DataArrays.
     """
-    if paths == "auto":
-        if isinstance(arrays, Mapping):
-            paths_out = tuple(arrays.keys())
-        else:
-            paths_out = tuple(a.name for a in arrays)
-    else:
-        if len(paths_out) != len(arrays):
-            msg = f"Length of paths ({len(paths)}) does not match length of arrays ({len(arrays)})."
-            raise ValueError(msg)
-        paths_out = paths
+    result: dict[str, DataArray] = {}
+    # parse the zarr group as a multiscale group
+    multiscale_group_parsed = Group.from_zarr(group)
+    multi_meta = multiscale_group_parsed.attributes.multiscales[multiscales_index]
+    ndim = len(multi_meta.axes)
+    multi_tx = multi_meta.coordinateTransformations
+    base_scale, base_trans = normalize_base_tx(multi_tx, ndim)
 
-    for path in paths_out:
-        if not isinstance(path, str):
-            msg = f"Got a non-string path: {path}. Expected a string."
-            raise TypeError(msg)
-        if paths.count(path) != 1:
-            msg = (
-                f"An element of paths is repeated: {path}. ",
-                "All elements of paths must be unique.",
-            )
+    wrapper_parsed = parse_wrapper(array_wrapper)
 
-    return tuple(zip(paths_out, arrays))
+    for dset in multi_meta.datasets:
+        dset_scale, dset_trans = normalize_tx(dset.coordinateTransformations)
+        tx_fused = fuse_scale_tx((base_scale, dset_scale)), fuse_trans_tx(
+            (base_trans, dset_trans)
+        )
+        arr_z: zarr.Array = group[dset.path]
+        arr_wrapped = wrapper_parsed.wrap(arr_z)
+        coords = coords_from_transforms(multi_meta.axes, tx_fused, arr_z.shape)
+        arr_out = DataArray(data=arr_wrapped, coords=coords)
+        result[dset.path] = arr_out
+
+    return result
+
+
+def get_parent(node: zarr.Group | zarr.Array):
+    return zarr.open(
+        store=node.store, path=os.path.join(*os.path.split(node.path)[:-1])
+    )
+
+
+def read_array(
+    array: zarr.Array,
+    *,
+    array_wrapper: BaseArrayWrapper | ArrayWrapperSpec = ZarrArrayWrapper(),
+):
+    """
+    Read a single Zarr array as an `xarray.DataArray`, using version 0.4 OME-NGFF multiscale
+    metadata
+    """
+
+    num_parents = len(array.path.split("/"))
+    wrapper = parse_wrapper(array_wrapper)
+    for _ in range(num_parents):
+        parent = get_parent(array)
+        array_path_rel = os.path.relpath(array.path, parent.path)
+        try:
+            model = Group.from_zarr(parent)
+            for multi in model.attributes.multiscales:
+                ndim = len(multi.axes)
+                multi_tx = multi.coordinateTransformations
+                base_scale, base_trans = normalize_base_tx(multi_tx, ndim)
+
+                for dset in multi.datasets:
+                    if dset.path == array_path_rel:
+                        dset_scale, dset_trans = normalize_tx(
+                            dset.coordinateTransformations
+                        )
+                        tx_fused = fuse_scale_tx(
+                            (base_scale, dset_scale)
+                        ), fuse_trans_tx((base_trans, dset_trans))
+                        coords = coords_from_transforms(
+                            multi.axes, tx_fused, array.shape
+                        )
+                        arr_wrapped = array_wrapper.wrap(array)
+                        return DataArray(arr_wrapped, coords=coords)
+        except ValueError:
+            pass
+    raise FileNotFoundError(
+        f"Could not find version 0.4 OME-NGFF multiscale metadata in any Zarr groups in the "
+        f"ancestral to the array at {array.path}"
+    )

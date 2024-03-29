@@ -9,9 +9,10 @@ packages = [{include = "xarray_ome_ngff", from="src"}]
 [tool.poetry.dependencies]
 python = "^3.9"
 xarray = "^2023.2.0"
-pydantic-ome-ngff = "^0.3.0"
+pydantic-ome-ngff = "^0.4.0"
 pint = "^0.20.1"
-pydantic = "^1.10.7"
+pydantic = "^2.0.0"
+dask = "^2024.3.1"
 
 
 [tool.poetry.group.dev.dependencies]
