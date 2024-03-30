@@ -22,7 +22,11 @@ pytest = "^7.2.1"
 pre-commit = "^3.0.4"
 mypy = "^1.1.1"
 pytest-cov = "^4.0.0"
+
+[tool.poetry.group.docs.dependencies]
 mkdocs-material = "^9.5.15"
+mkdocstrings = {extras = ["python"], version = "^0.24.0"}
+pytest-examples = "^0.0.9"
 
 [build-system]
 requires = ["poetry-core"]
