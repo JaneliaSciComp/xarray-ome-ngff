@@ -1,11 +1,14 @@
 from __future__ import annotations
-from dataclasses import dataclass
 from pydantic_ome_ngff.v04.multiscale import Group
-from typing import TYPE_CHECKING, cast, runtime_checkable, Protocol, TypedDict
+from typing import TYPE_CHECKING
+
+from xarray_ome_ngff.array_wrap import ArrayWrapperSpec
+from xarray_ome_ngff.array_wrap import BaseArrayWrapper
+from xarray_ome_ngff.array_wrap import ZarrArrayWrapper
+from xarray_ome_ngff.array_wrap import parse_wrapper
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Sequence, Literal
-    from typing_extensions import Self
+    from typing import Any, Dict, Sequence
 
 import numpy as np
 from xarray import DataArray
@@ -21,8 +24,6 @@ import zarr
 from zarr.storage import BaseStore
 
 import os
-from importlib.util import find_spec
-from abc import ABC, abstractmethod
 
 
 def multiscale_metadata(
@@ -109,19 +110,19 @@ def transforms_from_coords(
     transform_precision: int | None = None,
 ) -> tuple[tuple[Axis, ...], tuple[VectorScale, VectorTranslation]]:
     """
-    Generate Axes and CoordinateTransformations from an xarray.DataArray.
+    Generate Axes and CoordinateTransformations from the coordinates of an xarray.DataArray.
 
     Parameters
     ----------
-    array: xarray.DataArray
-        A DataArray with coordinates for each dimension. Scale and translation
-        transform parameters will be inferred from the coordinates for each dimension.
+    coords: dict[str, xarray.DataArray]
+        A dict of DataArray coordinates. Scale and translation
+        transform parameters are inferred from the coordinate data, per dimension.
         Note that no effort is made to ensure that the coordinates represent a regular
         grid. Axis types are inferred by querying the attributes of each
         coordinate for the 'type' key. Axis units are inferred by querying the
         attributes of each coordinate for the 'unit' key, and if that key is not present
-        then the 'units' key is queried. Axis names are inferred from the dimensions
-        of the array.
+        then the 'units' key is queried. Axis names are inferred from the dimension
+        of each coordinate array.
     normalize_units: bool, default is True
         If True, unit strings will be normalized to a canonical representation using the
         `pint` library. For example, the abbreviation "nm" will be normalized to
@@ -136,9 +137,9 @@ def transforms_from_coords(
 
     Returns
     -------
-        A tuple with 2 elements. The first element is a tuple of `Axis` objects, one per dimension;
-        the second element it itself a tuple with two elements, the first element of which is
-        a VectorScaleTransform and the second element is a VectorTranslationTransform.
+    tuple[tuple[Axis, ...], tuple[VectorScale, VectorTranslation]]
+        A tuple containing a tuple of `Axis` objects, one per dimension, and
+        a tuple with a VectorScaleTransform a VectorTranslationTransform.
         Both transformations are are derived from the coordinates of the input array.
     """
 
@@ -310,43 +311,8 @@ def fuse_coordinate_transforms(
     return out_scale, out_trans
 
 
-def fuse_trans_tx(translations: Sequence[VectorTranslation]) -> VectorTranslation:
-    trans_out = np.zeros(len(translations[0].translation))
-    for trans in translations:
-        trans_out += trans.translation
-    return VectorTranslation(translation=trans_out)
-
-
-def normalize_tx(
-    tx: tuple[VectorScale] | tuple[VectorScale, VectorTranslation]
-) -> tuple[VectorScale, VectorTranslation]:
-    """
-    Normalize `coordinateTransformations` metadata to expanded form.
-    """
-    if len(tx) == 1:
-        return (tx[0], VectorTranslation(translation=(1,) * len(tx[0].scale)))
-    return tx
-
-
-def normalize_base_tx(
-    transforms: (
-        None | tuple[()] | tuple[VectorScale] | tuple[VectorScale, VectorTranslation]
-    ),
-    ndim: int,
-):
-    if transforms is None or len(transforms) == 0:
-        scale = VectorScale(scale=(1,) * ndim)
-        trans = VectorTranslation(translation=(0,) * ndim)
-    elif len(transforms) == 1:
-        scale = transforms[0]
-        trans = VectorTranslation(translation=(0,) * ndim)
-    else:
-        scale, trans = transforms
-    return scale, trans
-
-
 def model_group(
-    arrays: dict[str, DataArray], *, transform_precision: int | None = None
+    *, arrays: dict[str, DataArray], transform_precision: int | None = None
 ) -> Group:
     """
     Create a model of an OME-NGFF multiscale group from a dict of `xarray.DataArray`.
@@ -392,10 +358,10 @@ def model_group(
 
 
 def create_group(
+    *,
     store: BaseStore,
     path: str,
     arrays: dict[str, DataArray],
-    *,
     transform_precision: int | None = None,
 ):
     """
@@ -413,110 +379,8 @@ def create_group(
 
     """
 
-    model = model_group(arrays, transform_precision=transform_precision)
+    model = model_group(arrays=arrays, transform_precision=transform_precision)
     return model.to_zarr(store, path)
-
-
-@runtime_checkable
-class Arrayish(Protocol):
-    dtype: np.dtype
-    shape: tuple[int, ...]
-
-    def __getitem__(self, *args) -> Self: ...
-class ArrayWrapperSpec(TypedDict):
-    name: Literal["dask"]
-    config: dict[str, Any]
-
-
-class DaskArrayWrapperConfig(TypedDict):
-    chunks: str | int | tuple[int, ...] | tuple[tuple[int, ...], ...]
-    meta: Any = None
-    inline_array: bool
-
-
-class ZarrArrayWrapperSpec(ArrayWrapperSpec):
-    name: Literal["zarr_array"]
-    config: dict[str, Any] = {}
-
-
-class DaskArrayWrapperSpec(ArrayWrapperSpec):
-    name: Literal["dask_array"]
-    config: DaskArrayWrapperConfig
-
-
-class BaseArrayWrapper(ABC):
-    @abstractmethod
-    def wrap(self, data: zarr.Array) -> Arrayish: ...
-
-
-@dataclass
-class ZarrArrayWrapper(BaseArrayWrapper):
-    """
-    An array wrapper that passes `zarr.Array` instances through unchanged.
-    """
-
-    def wrap(self, data: zarr.Array) -> Arrayish:
-        return data
-
-
-@dataclass
-class DaskArrayWrapper(BaseArrayWrapper):
-    """
-    An array wrapper that wraps `zarr.Array` in a dask array using `dask.array.from_array`.
-    """
-
-    chunks: str | int | tuple[int, ...] | tuple[tuple[int, ...], ...] = "auto"
-    meta: Any = None
-    inline_array: bool = True
-
-    def __post_init__(self) -> None:
-        """
-        Handle the lack of `dask`.
-        """
-        if find_spec("dask") is None:
-            msg = (
-                "Failed to import `dask` successfully. "
-                "The `dask` library is required to use `DaskArrayWrapper`."
-                "Install `dask` into your python environment, e.g. via "
-                "`pip install dask`, to resolve this issue."
-            )
-            ImportError(msg)
-
-    def wrap(self, data: zarr.Array):
-        """
-        Wrap the input in a dask array.
-        """
-        import dask.array as da  # noqa
-
-        return da.from_array(
-            data, chunks=self.chunks, inline_array=self.inline_array, meta=self.meta
-        )
-
-
-def parse_wrapper(data: ArrayWrapperSpec | BaseArrayWrapper):
-    """
-    Parse the input into a `BaseArrayWrapper` subclass.
-
-    If the input is already `BaseArrayWrapper`, it is returned as-is.
-    Otherwise, the input is presumed to be `ArrayWrapperSpec` and is passed to `resolve_wrapper`.
-    """
-    if isinstance(data, BaseArrayWrapper):
-        return data
-    return resolve_wrapper(data)
-
-
-def resolve_wrapper(spec: ArrayWrapperSpec) -> BaseArrayWrapper:
-    """
-    Convert an `ArrayWrapperSpec` into the corresponding `BaseArrayWrapper` subclass.
-    """
-    if spec["name"] == "dask_array":
-        spec = cast(DaskArrayWrapperConfig, spec)
-        return DaskArrayWrapper(**spec["config"])
-    elif spec["name"] == "zarr_array":
-        spec = cast(ZarrArrayWrapperSpec, spec)
-        return ZarrArrayWrapper(**spec["config"])
-    else:
-        raise ValueError(f"Spec {spec} is not recognized.")
 
 
 def read_group(
