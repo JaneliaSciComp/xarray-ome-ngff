@@ -14,12 +14,15 @@ pint = "^0.20.1"
 pydantic = "^2.0.0"
 dask = "^2024.3.1"
 
+[tool.poetry.extras]
+dask = ["dask"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.2.1"
 pre-commit = "^3.0.4"
 mypy = "^1.1.1"
 pytest-cov = "^4.0.0"
+mkdocs-material = "^9.5.15"
 
 [build-system]
 requires = ["poetry-core"]
