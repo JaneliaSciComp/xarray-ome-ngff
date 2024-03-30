@@ -4,19 +4,21 @@ import pytest
 from xarray import DataArray
 import numpy as np
 from typing import Literal, Optional, Any
-from xarray_ome_ngff.core import CoordinateAttrs, ureg
-from xarray_ome_ngff.v04.multiscale import (
+from xarray_ome_ngff.array_wrap import (
     DaskArrayWrapper,
     DaskArrayWrapperSpec,
     ZarrArrayWrapper,
     ZarrArrayWrapperSpec,
+    resolve_wrapper,
+)
+from xarray_ome_ngff.core import CoordinateAttrs, ureg
+from xarray_ome_ngff.v04.multiscale import (
     create_group,
     read_array,
     read_group,
     transforms_from_coords,
     model_group,
     multiscale_metadata,
-    resolve_wrapper,
     coords_from_transforms,
 )
 from zarr.storage import FSStore, BaseStore
@@ -322,7 +324,9 @@ def test_read_create_group(
     assert observed_group_model == expected_group_model
 
     # now test reconstructing our original arrays
-    zarr_group = create_group(store, path="test", arrays=arrays, transform_precision=8)
+    zarr_group = create_group(
+        store=store, path="test", arrays=arrays, transform_precision=8
+    )
 
     # write the array data
     for path, arr in arrays.items():
@@ -404,7 +408,9 @@ def test_multiscale_to_array(
         array_wrapper_parsed = array_wrapper
 
     arrays = dict(zip(paths, pyramid))
-    zarr_group = create_group(store, path="test", arrays=arrays, transform_precision=8)
+    zarr_group = create_group(
+        store=store, path="test", arrays=arrays, transform_precision=8
+    )
     for name, arr_expc in arrays.items():
         arr_obs = read_array(zarr_group[name], array_wrapper=array_wrapper)
         if isinstance(array_wrapper_parsed, ZarrArrayWrapper):
