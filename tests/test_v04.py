@@ -1,14 +1,17 @@
+from dataclasses import dataclass
 import zarr
 import pytest
 from xarray import DataArray
 import numpy as np
-from typing import Optional, Any
+from typing import Literal, Optional, Any
+from xarray_ome_ngff.core import CoordinateAttrs, ureg
 from xarray_ome_ngff.v04.multiscale import (
     DaskArrayWrapper,
     DaskArrayWrapperSpec,
     ZarrArrayWrapper,
     ZarrArrayWrapperSpec,
     create_group,
+    read_array,
     read_group,
     transforms_from_coords,
     model_group,
@@ -16,16 +19,22 @@ from xarray_ome_ngff.v04.multiscale import (
     resolve_wrapper,
     coords_from_transforms,
 )
-import dask.array as da
+from zarr.storage import FSStore, BaseStore
 from pydantic_ome_ngff.v04.axis import Axis
 from pydantic_ome_ngff.v04.multiscale import MultiscaleMetadata, Dataset, Group
 from pydantic_ome_ngff.v04.transform import (
     VectorScale,
     VectorTranslation,
 )
-import pint
 
-ureg = pint.UnitRegistry()
+try:
+    import dask.array as da
+
+    has_dask = True
+except ImportError:
+    has_dask = False
+
+skip_no_dask = pytest.mark.skipif(not has_dask, reason="Dask not installed")
 
 
 def create_coord(
@@ -38,11 +47,12 @@ def create_coord(
     return DataArray(
         (np.arange(shape) * scale) + translate,
         dims=(dim,),
-        attrs={"units": units},
+        attrs=CoordinateAttrs(units=units).model_dump(),
     )
 
 
 def create_array(
+    *,
     shape: tuple[int, ...],
     dims: tuple[str, ...],
     units: tuple[str | None, ...],
@@ -51,7 +61,7 @@ def create_array(
     **kwargs: Any,
 ):
     """
-    Create a dataarray with a shape and coordinates
+    Create a `DataArray` with a shape and coordinates
     defined by the parameters axes, units, types, scale, translate.
     """
     coords = []
@@ -63,19 +73,96 @@ def create_array(
     return DataArray(np.zeros(shape), coords=coords, **kwargs)
 
 
-def test_multiscale_metadata():
-    axes = ("z", "y", "x")
-    units = ("meter", "meter", "meter")
-    translate = (0, -8, 10)
-    scale = (1.0, 1.0, 10.0)
-    shape = (16,) * 3
-    data = create_array(shape, axes, units, scale, translate)
-    coarsen_kwargs = {**{dim: 2 for dim in axes}, "boundary": "trim"}
-    multi = [data, data.coarsen(**coarsen_kwargs).mean()]
-    multi.append(multi[-1].coarsen(**coarsen_kwargs).mean())
-    array_paths = [f"s{idx}" for idx in range(len(multi))]
-    multi_dict = dict(zip(array_paths, multi))
-    axes, transforms = tuple(zip(*(transforms_from_coords(m.coords) for m in multi)))
+@pytest.fixture(scope="function")
+def store(request, tmpdir):
+    param: Literal["memory", "fsstore", "nested_directory"] = request.param
+
+    if param == "memory":
+        return zarr.MemoryStore()
+    elif param == "fsstore":
+        return FSStore(str(tmpdir))
+    elif param == "nested_directory":
+        return zarr.NestedDirectoryStore(str(tmpdir))
+
+
+@dataclass
+class PyramidRequest:
+    shape: tuple[int, ...]
+    dims: tuple[str, ...] | Literal["auto"] = "auto"
+    units: tuple[str, ...] | Literal["auto"] = "auto"
+    scale: tuple[float, ...] | Literal["auto"] = "auto"
+    translate: tuple[float, ...] | Literal["auto"] = "auto"
+
+
+@pytest.fixture(scope="function")
+def pyramid(request) -> tuple[DataArray, DataArray, DataArray]:
+    """
+    Create a collection of DataArrays that represent a multiscale pyramid
+    """
+    param: PyramidRequest = request.param
+    shape = param.shape
+    if param.dims == "auto":
+        dims = tuple(map(str, range(len(shape))))
+    else:
+        dims = param.dims
+
+    if param.units == "auto":
+        units = ("meter",) * len(shape)
+    else:
+        units = param.units
+
+    if param.scale == "auto":
+        scale = (1,) * len(shape)
+    else:
+        scale = param.scale
+
+    if param.translate == "auto":
+        translate = (0,) * len(shape)
+    else:
+        translate = param.translate
+
+    data = create_array(
+        shape=shape, dims=dims, units=units, scale=scale, translate=translate
+    )
+
+    coarsen_kwargs = {**{dim: 2 for dim in data.dims}, "boundary": "trim"}
+    multi = (data, data.coarsen(**coarsen_kwargs).mean())
+    multi += (multi[-1].coarsen(**coarsen_kwargs).mean(),)
+    return multi
+
+
+@pytest.mark.parametrize(
+    "pyramid",
+    [
+        PyramidRequest(shape=(16,) * 3, units=("nanometer", "nm", "nanometer")),
+    ],
+    indirect=["pyramid"],
+)
+def test_make_pyramid(pyramid: tuple[DataArray, DataArray, DataArray]):
+    assert len(pyramid) == 3
+
+
+@pytest.mark.parametrize(
+    "pyramid",
+    [
+        PyramidRequest(
+            shape=(16,) * 3,
+            scale=(1.0, 1.2, 0.5),
+            translate=(0.0, 1.1, 0.0),
+            dims=("z", "y", "x"),
+        ),
+        PyramidRequest(
+            shape=(16,) * 4,
+            units=("second", "nanometer", "nanometer", "nanometer"),
+            scale=(2.0, 3.0, 5, 1.5),
+        ),
+    ],
+    indirect=["pyramid"],
+)
+def test_multiscale_metadata(pyramid: tuple[DataArray, DataArray, DataArray]):
+    array_paths = [f"s{idx}" for idx in range(len(pyramid))]
+    multi_dict = dict(zip(array_paths, pyramid))
+    axes, transforms = tuple(zip(*(transforms_from_coords(m.coords) for m in pyramid)))
 
     multiscale_meta = multiscale_metadata(multi_dict, name="foo").model_dump()
 
@@ -83,7 +170,7 @@ def test_multiscale_metadata():
         name="foo",
         datasets=[
             Dataset(path=array_paths[idx], coordinateTransformations=transforms[idx])
-            for idx, m in enumerate(multi)
+            for idx, m in enumerate(pyramid)
         ],
         axes=axes[0],
     ).model_dump()
@@ -121,156 +208,113 @@ def test_create_coords():
     )
 
 
-def test_create_axes_transforms():
-    shape = (10, 10, 10)
-    dims = ("z", "y", "x")
-    units = ("meter", "nanometer", "kilometer")
-    scale = (1, 2, 3)
-    translate = (-1, 2, 0)
+@pytest.mark.parametrize("normalize_units", [True, False])
+@pytest.mark.parametrize("infer_axis_type", [True, False])
+def test_create_axes_transforms(normalize_units: bool, infer_axis_type: bool):
+    """
+    Test that `Axis` and `coordinateTransformations` objects can be created from
+    `DataArray` coordinates.
+    """
+
+    shape = (3, 10, 10, 10)
+    dims = ("c", "t", "y", "x")
+    scale = (1, 1, 2, 3)
+    translate = (0, -1, 2, 0)
+
+    if normalize_units:
+        units_in = (None, "s", "nm", "km")
+        units_expected = (
+            None,
+            *tuple(ureg.get_name(u, case_sensitive=True) for u in units_in[1:]),
+        )
+    else:
+        units_in = (None, "second", "nanometer", "kilometer")
+        units_expected = units_in
+
+    if infer_axis_type:
+        axis_type_expected = (None, "time", "space", "space")
+    else:
+        axis_type_expected = (None,) * len(shape)
 
     array = create_array(
         shape=shape,
         dims=dims,
-        units=units,
+        units=units_in,
         scale=scale,
         translate=translate,
     )
 
-    axes, transforms = transforms_from_coords(array.coords)
+    axes, transforms = transforms_from_coords(
+        array.coords, normalize_units=normalize_units, infer_axis_type=infer_axis_type
+    )
+
     scale_tx, translation_tx = transforms
 
     for idx, ax in enumerate(axes):
-        assert ax.unit == units[idx]
+        assert ax.unit == units_expected[idx]
         assert ax.name == dims[idx]
+        assert ax.type == axis_type_expected[idx]
         assert scale_tx.scale[idx] == scale[idx]
         assert translation_tx.translation[idx] == translate[idx]
 
-    for idx, ax in enumerate(axes):
-        assert ax.unit == units[idx]
 
-
-def test_normalize_units():
-    shape = (10, 10, 10)
-    dims = ("z", "y", "x")
-    units = ("m", "nm", "km")
-    scale = (1, 2, 3)
-    translate = (-1, 2, 0)
-
-    array = create_array(
-        shape=shape,
-        dims=dims,
-        units=units,
-        scale=scale,
-        translate=translate,
-    )
-
-    axes, _ = transforms_from_coords(array.coords)
-    assert all(
-        ax.unit == ureg.get_name(d, case_sensitive=True) for ax, d in zip(axes, units)
-    )
-
-    axes, _ = transforms_from_coords(array.coords, normalize_units=False)
-    assert all(ax.unit == d for ax, d in zip(axes, units))
-
-
-def test_infer_axis_type() -> None:
-    shape = (
-        1,
-        10,
-        10,
-        10,
-    )
-    dims = ("c", "t", "z", "y", "x")
-    units = (None, "second", "meter", "nanometer", "kilometer")
-    scale = (1, 1, 1, 2, 3)
-    translate = (0, 0, -1, 2, 0)
-
-    array = create_array(
-        shape=shape,
-        dims=dims,
-        units=units,
-        scale=scale,
-        translate=translate,
-    )
-
-    axes, _ = transforms_from_coords(array.coords)
-    for ax in axes:
-        base_unit = ureg.get_base_units(ax.unit)[-1]
-        if base_unit == ureg["meter"]:
-            assert ax.type == "space"
-        elif base_unit == ureg["second"]:
-            assert ax.type == "time"
-
-
+@pytest.mark.parametrize(
+    "store", ["memory", "fsstore", "nested_directory"], indirect=["store"]
+)
+@pytest.mark.parametrize("paths", [("s0", "s1", "s2"), ("foo/s0", "foo/s1", "foo/s2")])
+@pytest.mark.parametrize(
+    "pyramid",
+    [
+        PyramidRequest(
+            shape=(16,) * 3,
+            scale=(1.0, 1.2, 0.5),
+            translate=(0.0, 1.1, 0.0),
+            dims=("z", "y", "x"),
+        ),
+        PyramidRequest(
+            shape=(16,) * 4,
+            units=("second", "nanometer", "nanometer", "nanometer"),
+            scale=(2.0, 3.0, 5, 1.5),
+        ),
+    ],
+    indirect=["pyramid"],
+)
 @pytest.mark.parametrize(
     "array_wrapper",
     (
         ZarrArrayWrapper(),
-        DaskArrayWrapper(chunks=10),
         {"name": "zarr_array", "config": {}},
-        {"name": "dask_array", "config": {"chunks": 10}},
+        pytest.param(DaskArrayWrapper(chunks=10), marks=skip_no_dask),
+        pytest.param(
+            {"name": "dask_array", "config": {"chunks": 5}}, marks=skip_no_dask
+        ),
     ),
 )
-@pytest.mark.parametrize("ndim", (2, 3, 4))
 def test_read_create_group(
+    store: BaseStore,
+    paths: tuple[str, str, str],
+    pyramid: tuple[DataArray, DataArray, DataArray],
     array_wrapper: (
         ZarrArrayWrapper
         | DaskArrayWrapper
         | DaskArrayWrapperSpec
         | ZarrArrayWrapperSpec
     ),
-    ndim: int,
 ) -> None:
 
-    store = zarr.MemoryStore()
-
-    if ndim == 2:
-        axes = ("z", "y")
-        units = ("nanometer",) * ndim
-    elif ndim == 3:
-        axes = ("z", "y", "x")
-        units = ("nanometer",) * ndim
-    elif ndim == 4:
-        axes = ("t", "z", "y", "x")
-        units = ("second",) + ("nanometer",) * 3
-    axis_types = ["space" if unit == "nanometer" else "time" for unit in units]
-    axis_objects = [
-        Axis(name=ax, type=axis_types[idx], unit=units[idx])
-        for idx, ax in enumerate(axes)
-    ]
-    arrays = {}
-    base_scale = [1.0, 2.0, 3.0, 4.0][:ndim]
-    base_trans = [0.0, 1.5, 2.5, 3.5][:ndim]
-    s1_scale = [2 * x for x in base_scale]
-    s1_trans = [t + s / 2 for t, s in zip(base_trans, base_scale)]
-    arrays["s0"] = create_array(
-        shape=(10,) * ndim,
-        units=units,
-        dims=axes,
-        scale=base_scale,
-        translate=base_trans,
-        name="name_s0",
-    )
-
-    arrays["s1"] = create_array(
-        shape=(5,) * ndim,
-        units=units,
-        dims=axes,
-        scale=s1_scale,
-        translate=s1_trans,
-        name="name_s1",
-    )
-
     # write some values to the arrays
-    arrays["s0"][:] = 1
-    arrays["s1"][:] = 2
+    pyramid[0][:] = 1
+    pyramid[1][:] = 2
+    pyramid[2][:] = 3
 
+    arrays = dict(zip(paths, pyramid))
+    axes, transforms = tuple(zip(*(transforms_from_coords(m.coords) for m in pyramid)))
     expected_group_model = Group.from_arrays(
         arrays=arrays.values(),
         paths=arrays.keys(),
-        axes=axis_objects,
-        scales=[base_scale, s1_scale],
-        translations=[base_trans, s1_trans],
+        axes=axes[0],
+        scales=[t[0].scale for t in transforms],
+        translations=[t[1].translation for t in transforms],
     )
 
     observed_group_model = model_group(arrays=arrays)
@@ -278,7 +322,7 @@ def test_read_create_group(
     assert observed_group_model == expected_group_model
 
     # now test reconstructing our original arrays
-    zarr_group = create_group(store, path="test", arrays=arrays)
+    zarr_group = create_group(store, path="test", arrays=arrays, transform_precision=8)
 
     # write the array data
     for path, arr in arrays.items():
@@ -301,12 +345,76 @@ def test_read_create_group(
                 observed_array.data.chunksize
                 == observed_array.data.rechunk(array_wrapper_parsed.chunks).chunksize
             )
+        assert expected_array.attrs == observed_array.attrs
         assert observed_array.equals(expected_array)
 
 
-def multiscale_to_array():
-    group_model = Group.from_arrays(
-        (np.zeros((10,)), np.zeros((5,))),
-        ("s0", "s1"),
-        axes=(Axis(name="x", type="space", unit="nanometer")),
-    )
+@pytest.mark.parametrize(
+    "store", ["memory", "fsstore", "nested_directory"], indirect=["store"]
+)
+@pytest.mark.parametrize("paths", [("s0", "s1", "s2"), ("foo/s0", "foo/s1", "foo/s2")])
+@pytest.mark.parametrize(
+    "pyramid",
+    [
+        PyramidRequest(
+            shape=(16,) * 3,
+            scale=(1.0, 1.2, 0.5),
+            translate=(0.0, 1.1, 0.0),
+            dims=("z", "y", "x"),
+        ),
+        PyramidRequest(
+            shape=(16,) * 4,
+            units=("second", "nanometer", "nanometer", "nanometer"),
+            scale=(2.0, 3.0, 5, 1.5),
+        ),
+    ],
+    indirect=["pyramid"],
+)
+@pytest.mark.parametrize(
+    "array_wrapper",
+    (
+        ZarrArrayWrapper(),
+        {"name": "zarr_array", "config": {}},
+        pytest.param(DaskArrayWrapper(chunks=10), marks=skip_no_dask),
+        pytest.param(
+            {"name": "dask_array", "config": {"chunks": 5}}, marks=skip_no_dask
+        ),
+    ),
+)
+def test_multiscale_to_array(
+    store: BaseStore,
+    paths: tuple[str, str, str],
+    pyramid: tuple[DataArray, DataArray, DataArray],
+    array_wrapper: (
+        ZarrArrayWrapper
+        | DaskArrayWrapper
+        | DaskArrayWrapperSpec
+        | ZarrArrayWrapperSpec
+    ),
+):
+
+    # write some values to the arrays
+    pyramid[0][:] = 1
+    pyramid[1][:] = 2
+    pyramid[2][:] = 3
+
+    if isinstance(array_wrapper, dict):
+        array_wrapper_parsed = resolve_wrapper(array_wrapper)
+    else:
+        array_wrapper_parsed = array_wrapper
+
+    arrays = dict(zip(paths, pyramid))
+    zarr_group = create_group(store, path="test", arrays=arrays, transform_precision=8)
+    for name, arr_expc in arrays.items():
+        arr_obs = read_array(zarr_group[name], array_wrapper=array_wrapper)
+        if isinstance(array_wrapper_parsed, ZarrArrayWrapper):
+            assert isinstance(arr_obs.data, np.ndarray)
+        elif isinstance(array_wrapper_parsed, DaskArrayWrapper):
+            assert isinstance(arr_obs.data, da.Array)
+            assert (
+                arr_obs.data.chunksize
+                == arr_obs.data.rechunk(array_wrapper_parsed.chunks).chunksize
+            )
+
+        for coord_name in arr_expc.coords:
+            assert arr_obs.coords[coord_name].equals(arr_expc.coords[coord_name])
