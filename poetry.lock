@@ -1650,7 +1650,10 @@ files = [
 docs = ["furo", "jaraco.packaging (>=9.3)", "jaraco.tidelift (>=1.4)", "rst.linker (>=1.9)", "sphinx (>=3.5)", "sphinx-lint"]
 testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=2.2)", "pytest-ignore-flaky", "pytest-mypy", "pytest-ruff (>=0.2.1)"]
 
+[extras]
+dask = ["dask"]
+
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "46aaaff17c8ddbba9f5ce0e4f14a52ca9ab328ec3e6db6d717494ae4d2039c9f"
+content-hash = "c459925ceb53924ac490a48e9bfa44a585d31e146cec53e6c0c87c302d13d2d7"
