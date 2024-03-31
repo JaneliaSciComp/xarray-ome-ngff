@@ -22,7 +22,7 @@ to generate Xarray datastructures from OME-NGFF data -- e.g., this package.
 
 This example accesses a public OME-NGFF multiscale image, which is stored in a Zarr group that 
 contains several Zarr arrays, one per level of detail.
-The [`read_multiscale_group`](./api/v04/multiscale.md#read_multiscale_group) function takes a 
+The [`read_multiscale_group`](./api/#xarray_ome_ngff.read_multiscale_group) function takes a 
 reference to that OME-NGFF group and returns a dictionary of [`xarray.DataArray`](https://docs.xarray.dev/en/stable/generated/xarray.DataArray.html), one per Zarr array contained in the multiscale group. 
 OME-NGFF coordinate metadata (axis names, units, scaling and translation parameters) are read from 
 the attributes of the Zarr group to generate coordinates for each `DataArray`.
@@ -64,7 +64,7 @@ Coordinates:
 
 Note this code from the above example:
 
-```py test="skip" lint="skip"
+```python
 array_wrapper = DaskArrayWrapper(chunks=10)
 arrays = read_multiscale_group(group, array_wrapper=array_wrapper)
 ```
@@ -223,7 +223,7 @@ It did not write any of the array data, but this is presumably the point of the 
 library does not provide any tools for writing data to Zarr arrays. For small arrays, the following
 code should work:
 
-```py test="skip"
+```python
 for path, array in arrays.items():
   group[path][:] = array.data
 ```

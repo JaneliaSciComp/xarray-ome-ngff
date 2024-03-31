@@ -31,6 +31,7 @@ theme:
 nav:
     - About: index.md
     - API:
+      - api/index.md
       - core:
         - api/array_wrap.md
       - v04:
