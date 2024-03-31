@@ -1,8 +1,18 @@
-from typing import Union, Dict, List
+from pydantic import BaseModel
+from typing import Union, Dict, List, Optional
 
 import pint
 
 ureg = pint.UnitRegistry()
 
+
+class CoordinateAttrs(BaseModel):
+    """
+    A model of the attributes of a DataArray coordinate
+    """
+
+    units: Optional[str]
+
+
 JSON = Union[Dict[str, "JSON"], List["JSON"], str, int, float, bool, None]
-ngff_versions = ("0.4", "0.5-dev")
+NGFF_VERSIONS = ("0.4",)
