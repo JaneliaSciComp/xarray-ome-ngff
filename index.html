@@ -901,13 +901,13 @@ and <code>DataArray</code> values.</p>
 <li>stored in the <code>shape</code> attribute of a Zarr array</li>
 </ul>
 </li>
-<li>The separation between samples<ul>
-<li>stored in one, or possibly 2, instances of <a href="https://ngff.openmicroscopy.org/0.4/index.html#trafo-md"><code>coordinateTransformations</code> metadata</a>. </li>
+<li>The separation between adjacent samples<ul>
+<li>stored in one or two instances of <a href="https://ngff.openmicroscopy.org/0.4/index.html#trafo-md"><code>coordinateTransformations</code> metadata</a>. </li>
 <li>If this value is stored in two places, the two intermediate values must be multiplied to get the final value.</li>
 </ul>
 </li>
 <li>The location of the first sample <ul>
-<li>stored in one, or possibly 2, instances of <a href="https://ngff.openmicroscopy.org/0.4/index.html#trafo-md"><code>coordinateTransformations</code> metadata</a>. </li>
+<li>stored in one or two instances of <a href="https://ngff.openmicroscopy.org/0.4/index.html#trafo-md"><code>coordinateTransformations</code> metadata</a>. </li>
 <li>If this value is stored in two places, the intermediate two values must be summed to get the final value.</li>
 </ul>
 </li>
