@@ -227,11 +227,11 @@ OME-NGFF models an image as if each sample corresponds to an element from a fini
 
 - The number of samples 
     - stored in the `shape` attribute of a Zarr array
-- The separation between samples
-    - stored in one, or possibly 2, instances of [`coordinateTransformations` metadata](https://ngff.openmicroscopy.org/0.4/index.html#trafo-md). 
+- The separation between adjacent samples
+    - stored in one or two instances of [`coordinateTransformations` metadata](https://ngff.openmicroscopy.org/0.4/index.html#trafo-md). 
     - If this value is stored in two places, the two intermediate values must be multiplied to get the final value.
 - The location of the first sample 
-    - stored in one, or possibly 2, instances of [`coordinateTransformations` metadata](https://ngff.openmicroscopy.org/0.4/index.html#trafo-md). 
+    - stored in one or two instances of [`coordinateTransformations` metadata](https://ngff.openmicroscopy.org/0.4/index.html#trafo-md). 
     - If this value is stored in two places, the intermediate two values must be summed to get the final value.
 
 By contrast, in the coordinate framework used by Xarray, each sample of an image can be associated with multiple elements from multiple irregular grids. To support this expressiveness, Xarray represents these grids explicitly, as arrays of values. So where OME-NGFF defines coordinates with 3 numbers per dimension, Xarray would conventionally use `N` numbers per dimension, where `N` is the number of samples along that dimension (but it is possible to use more coordinates than this).
