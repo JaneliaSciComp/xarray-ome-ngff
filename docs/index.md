@@ -1,6 +1,6 @@
 # `xarray-ome-ngff`
 
-Integrating [Xarray](https://docs.xarray.dev/en/stable/) with [OME-NGFF](https://ngff.openmicroscopy.org/)
+Integrating [Xarray](https://docs.xarray.dev/en/stable/) with [OME-NGFF](https://ngff.openmicroscopy.org/).
 
 # Motivation
 
@@ -212,6 +212,10 @@ print(tuple(group.arrays()))
 """
 (('s0', <zarr.core.Array '/my_group/s0' (10, 10) uint8>), ('s1', <zarr.core.Array '/my_group/s1' (5, 5) uint8>))
 """
+# write data to the arrays
+for path, array in arrays.items():
+  group[path][:] = array.data
+
 ```
 
 Note: the above example only wrote Zarr array and group metadata, and modified Zarr group attributes.
