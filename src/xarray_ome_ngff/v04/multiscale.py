@@ -376,6 +376,9 @@ def create_group(
     path: str
         The path in the storage backend for the multiscale group.
     transform_precision: int | None, default is None
+        Whether, and how much, to round the transformations estimated from the coordinates.
+        The default (`None`) results in no rounding; specifying an `int` x will round transforms to
+        x decimal places using `numpy.round(transform, x)`.
 
     """
 
@@ -390,10 +393,10 @@ def read_group(
     multiscales_index: int = 0,
 ) -> dict[str, DataArray]:
     """
-    Create a dict of `xarray.DataArray` from a Zarr group that implements version 0.4 of the
+    Create a dictionary of `xarray.DataArray` from a Zarr group that implements version 0.4 of the
     OME-NGFF multiscale image specification.
 
-    The keys of the `dict` are the paths to the Zarr arrays. The values of the `dict` are
+    The keys of the dictionary are the paths to the Zarr arrays. The values of the dictionary are
     `xarray.DataArray` objects, one per Zarr array described in the OME-NGFF multiscale metadata,
     with dimensions and coordinates that are consistent with the OME-NGFF `Axes` and
     `coordinateTransformations` metadata.
@@ -412,6 +415,10 @@ def read_group(
         Version 0.4 of the OME-NGFF multiscales spec states that multiscale
         metadata is stored in a JSON array within Zarr group attributes.
         This parameter determines which element from that array to use when defining DataArrays.
+
+    Returns
+    -------
+    dict[str, DataArray]
     """
     result: dict[str, DataArray] = {}
     # parse the zarr group as a multiscale group
@@ -432,7 +439,9 @@ def read_group(
 
 
 def get_parent(node: zarr.Group | zarr.Array):
-
+    """
+    Get the parent node of a Zarr array or group
+    """
     if hasattr(node.store, "path"):
         store_path = node.store.path
         if node.path == "":

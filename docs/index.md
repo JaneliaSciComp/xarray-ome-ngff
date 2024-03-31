@@ -233,6 +233,23 @@ But this will not be performant for larger arrays. You may need to use parallel 
 
 # Details
 
+## Inferring transform metadata from explicit coordinates
+
+OME-NGFF models an image as if each sample corresponds to an element from a finite, regular, N-dimensional grid. In this model, which is common in bioimaging, each axis of the that grid is parametrized by 3 numbers: 
+
+- The number of samples 
+    - stored in the `shape` attribute of a Zarr array
+- The separation between samples
+    - stored in one, or possibly 2, instances of [`coordinateTransformations` metadata](https://ngff.openmicroscopy.org/0.4/index.html#trafo-md). 
+    - If this value is stored in two places, the two intermediate values must be multiplied to get the final value.
+- The location of the first sample 
+    - stored in one, or possibly 2, instances of [`coordinateTransformations` metadata](https://ngff.openmicroscopy.org/0.4/index.html#trafo-md). 
+    - If this value is stored in two places, the intermediate two values must be summed to get the final value.
+
+By contrast, in the coordinate framework used by Xarray, each sample of an image can be associated with multiple elements from multiple irregular grids. To support this expressiveness, Xarray represents these grids explicitly, as arrays of values. So where OME-NGFF defines coordinates with 3 numbers per dimension, Xarray would conventionally use `N` numbers per dimension, where `N` is the number of samples along that dimension (but it is possible to use more coordinates than this).
+
+Converting between the OME-NGFF and Xarray coordinate representations is straightforward, but it requires some care. Generating a translation transformation from Xarray-style coordinates is easy -- we just take the first element of each coordinate variable. But generating a scaling transformation can be delicate, because we have to compute the difference between two adjacent coordinate values, per axis, and this can introduce floating point arithmetic errors, which can be corrected by rounding. Thus, routines that generate OME-NGFF coordinate metadata from Xarray coordinates in `xarray-ome-ngff` (like the imaginatively named [`transforms_from_coords`](./api/v04/multiscale.md#xarray_ome_ngff.v04.multiscale.transforms_from_coords)) take a `transform_precision` keyword argument that controls how much rounding to apply when generating OME-NGFF transforms from Xarray coordinates. The default value of `transform_precision` is `None`, which results in no rounding at all.
+
 ## Array wrapping
 
 This library uses [`zarr-python`](https://zarr.readthedocs.io/en/stable/) for access to Zarr 
