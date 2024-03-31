@@ -1,0 +1,63 @@
+site_name: xarray-ome-ngff
+site_url: https://janeliascicomp.github.io/xarray-ome-ngff/
+site_author: Davis Bennett
+site_description: >-
+  Xarray support for data saved in the OME-NGFF file format.
+
+# Repository
+repo_name: janeliascicomp/xarray-ome-ngff
+repo_url: https://github.com/janeliascicomp/xarray-ome-ngff
+
+# Copyright
+copyright: Copyright &copy; 2016 - 2024 HHMI / Janelia
+
+theme:
+  features:
+    - navigation.expand
+  name: material
+  palette: 
+  # Palette toggle for light mode
+  - scheme: default
+    toggle:
+      icon: material/brightness-7 
+      name: Switch to dark mode
+
+  # Palette toggle for dark mode
+  - scheme: slate
+    toggle:
+      icon: material/brightness-4
+      name: Switch to light mode
+
+nav:
+    - About: index.md
+    - API:
+      - core:
+        - api/array_wrap.md
+      - v04:
+        - api/v04/multiscale.md
+
+plugins:
+- mkdocstrings:
+    handlers:
+        python:
+          options:
+            docstring_style: numpy
+            members_order: source
+            separate_signature: true
+            filters: ["!^_"]
+            docstring_options:
+              ignore_init_summary: true
+            merge_init_into_class: true
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - toc:
+      baselevel: 2
+      toc_depth: 4
+      permalink: "#"

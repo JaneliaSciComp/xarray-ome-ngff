@@ -1,0 +1,1 @@
+::: xarray_ome_ngff.v04.multiscale

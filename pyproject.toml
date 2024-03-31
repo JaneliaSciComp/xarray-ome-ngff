@@ -9,16 +9,26 @@ packages = [{include = "xarray_ome_ngff", from="src"}]
 [tool.poetry.dependencies]
 python = "^3.9"
 xarray = "^2023.2.0"
-pydantic-ome-ngff = "^0.3.0"
+pydantic-ome-ngff = "^0.5.0"
 pint = "^0.20.1"
-pydantic = "^1.10.7"
+pydantic = "^2.0.0"
+dask = "^2024.3.1"
 
+[tool.poetry.extras]
+dask = ["dask"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.2.1"
 pre-commit = "^3.0.4"
 mypy = "^1.1.1"
 pytest-cov = "^4.0.0"
+
+[tool.poetry.group.docs.dependencies]
+mkdocs-material = "^9.5.15"
+mkdocstrings = {extras = ["python"], version = "^0.24.0"}
+pytest-examples = "^0.0.9"
+requests = "^2.31.0"
+aiohttp = "^3.9.3"
 
 [build-system]
 requires = ["poetry-core"]
