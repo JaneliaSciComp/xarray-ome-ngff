@@ -26,6 +26,10 @@ class ArrayWrapperSpec(TypedDict):
 
 
 class DaskArrayWrapperConfig(TypedDict):
+    """
+    A model of the attributes of `DaskArrayWrapper`.
+    """
+
     chunks: str | int | tuple[int, ...] | tuple[tuple[int, ...], ...]
     meta: Any = None
     inline_array: bool
@@ -49,7 +53,7 @@ class BaseArrayWrapper(ABC):
 @dataclass
 class ZarrArrayWrapper(BaseArrayWrapper):
     """
-    An array wrapper that passes `zarr.Array` instances through unchanged.
+    An array wrapper that passes a `zarr.Array` instances through unchanged.
     """
 
     def wrap(self, data: zarr.Array) -> Arrayish:
@@ -59,7 +63,20 @@ class ZarrArrayWrapper(BaseArrayWrapper):
 @dataclass
 class DaskArrayWrapper(BaseArrayWrapper):
     """
-    An array wrapper that wraps `zarr.Array` in a dask array using `dask.array.from_array`.
+    An array wrapper that wraps a `zarr.Array` in a dask array using `dask.array.from_array`.
+    The attributes of this class are a subset of the keyword arguments to `dask.array.from_array`;
+    specifically, those keyword arguments that make sense when the input to `from_array` is a
+    `zarr.Array`.
+
+    Attributes
+    ----------
+    chunks: str | int | tuple[int, ...]  tuple[tuple[int, ...], ...] = "auto"
+        The chunks for the Dask array. See `dask.array.from_array` for details.
+    meta: Any = `None`
+        The array type of each chunk of the Dask array. See `dask.array.from_array` for details.
+    inline_array: bool = True
+        Whether slices of this array should be inlined into the Dask task graph.
+        See `dask.array.from_array` for details.
     """
 
     chunks: str | int | tuple[int, ...] | tuple[tuple[int, ...], ...] = "auto"

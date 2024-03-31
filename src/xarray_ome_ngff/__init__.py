@@ -80,10 +80,10 @@ def create_multiscale_group(
 
 
 __all__ = [
-    read_multiscale_array,
-    read_multiscale_array,
-    create_multiscale_group,
-    model_multiscale_group,
-    DaskArrayWrapper,
-    ZarrArrayWrapper,
+    "read_multiscale_array",
+    "read_multiscale_array",
+    "create_multiscale_group",
+    "model_multiscale_group",
+    "DaskArrayWrapper",
+    "ZarrArrayWrapper",
 ]
