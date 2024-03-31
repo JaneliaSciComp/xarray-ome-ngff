@@ -6,6 +6,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://janeliascicomp.github.io/xarray-ome-ngff/api/</loc>
+         <lastmod>2024-03-31</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://janeliascicomp.github.io/xarray-ome-ngff/api/array_wrap/</loc>
          <lastmod>2024-03-31</lastmod>
          <changefreq>daily</changefreq>
