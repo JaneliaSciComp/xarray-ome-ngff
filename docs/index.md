@@ -64,7 +64,7 @@ Coordinates:
 
 Note this code from the above example:
 
-```python
+```py test="skip" lint="skip"
 array_wrapper = DaskArrayWrapper(chunks=10)
 arrays = read_multiscale_group(group, array_wrapper=array_wrapper)
 ```
@@ -219,7 +219,7 @@ It did not write any of the array data, but this is presumably the point of the 
 library does not provide any tools for writing data to Zarr arrays. For small arrays, the following
 code should work:
 
-```python
+```py test="skip"
 for path, array in arrays.items():
   group[path][:] = array.data
 ```
