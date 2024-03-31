@@ -3,8 +3,7 @@
 Integrating [Xarray](https://docs.xarray.dev/en/stable/) with [OME-NGFF](https://ngff.openmicroscopy.org/).
 
 ## Help
-
-See [documentation](https://janeliscicomp.github.io/xarray-multiscale) for more details
+See [documentation](https://janeliascicomp.github.io/xarray-ome-ngff/) for more details
 
 ## Usage
 
