@@ -712,7 +712,7 @@ to generate Xarray datastructures from OME-NGFF data -- e.g., this package.</p>
 <h3 id="read-an-ome-ngff-zarr-group-as-a-dict-of-xarraydataarray">Read an OME-NGFF Zarr group as a dict of <code>xarray.DataArray</code><a class="headerlink" href="#read-an-ome-ngff-zarr-group-as-a-dict-of-xarraydataarray" title="Permanent link">#</a></h3>
 <p>This example accesses a public OME-NGFF multiscale image, which is stored in a Zarr group that 
 contains several Zarr arrays, one per level of detail.
-The <a href="./api/#xarray_ome_ngff.read_multiscale_group"><code>read_multiscale_group</code></a> function takes a 
+The <a href="api/#xarray_ome_ngff.read_multiscale_group"><code>read_multiscale_group</code></a> function takes a 
 reference to that OME-NGFF group and returns a dictionary of <a href="https://docs.xarray.dev/en/stable/generated/xarray.DataArray.html"><code>xarray.DataArray</code></a>, one per Zarr array contained in the multiscale group. 
 OME-NGFF coordinate metadata (axis names, units, scaling and translation parameters) are read from 
 the attributes of the Zarr group to generate coordinates for each <code>DataArray</code>.</p>
@@ -889,18 +889,10 @@ and <code>DataArray</code> values.</p>
 </span><span id="__span-3-62"><a id="__codelineno-3-62" name="__codelineno-3-62" href="#__codelineno-3-62"></a><span class="sd">((&#39;s0&#39;, &lt;zarr.core.Array &#39;/my_group/s0&#39; (10, 10) uint8&gt;), (&#39;s1&#39;, &lt;zarr.core.Array &#39;/my_group/s1&#39; (5, 5) uint8&gt;))</span>
 </span><span id="__span-3-63"><a id="__codelineno-3-63" name="__codelineno-3-63" href="#__codelineno-3-63"></a><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="__span-3-64"><a id="__codelineno-3-64" name="__codelineno-3-64" href="#__codelineno-3-64"></a><span class="c1"># write data to the arrays</span>
-</span><span id="__span-3-65"><a id="__codelineno-3-65" name="__codelineno-3-65" href="#__codelineno-3-65"></a><span class="k">for</span> <span class="n">path</span><span class="p">,</span> <span class="n">array</span> <span class="ow">in</span> <span class="n">arrays</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-</span><span id="__span-3-66"><a id="__codelineno-3-66" name="__codelineno-3-66" href="#__codelineno-3-66"></a>  <span class="n">group</span><span class="p">[</span><span class="n">path</span><span class="p">][:]</span> <span class="o">=</span> <span class="n">array</span><span class="o">.</span><span class="n">data</span>
+</span><span id="__span-3-65"><a id="__codelineno-3-65" name="__codelineno-3-65" href="#__codelineno-3-65"></a><span class="c1"># this will not work if your arrays are large!</span>
+</span><span id="__span-3-66"><a id="__codelineno-3-66" name="__codelineno-3-66" href="#__codelineno-3-66"></a><span class="k">for</span> <span class="n">path</span><span class="p">,</span> <span class="n">array</span> <span class="ow">in</span> <span class="n">arrays</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+</span><span id="__span-3-67"><a id="__codelineno-3-67" name="__codelineno-3-67" href="#__codelineno-3-67"></a>  <span class="n">group</span><span class="p">[</span><span class="n">path</span><span class="p">][:]</span> <span class="o">=</span> <span class="n">array</span><span class="o">.</span><span class="n">data</span>
 </span></code></pre></div>
-<p>Note: the above example only wrote Zarr array and group metadata, and modified Zarr group attributes.
-It did not write any of the array data, but this is presumably the point of the whole endeavor. This 
-library does not provide any tools for writing data to Zarr arrays. For small arrays, the following
-code should work:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">for</span> <span class="n">path</span><span class="p">,</span> <span class="n">array</span> <span class="ow">in</span> <span class="n">arrays</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  <span class="n">group</span><span class="p">[</span><span class="n">path</span><span class="p">][:]</span> <span class="o">=</span> <span class="n">array</span><span class="o">.</span><span class="n">data</span>
-</span></code></pre></div>
-<p>But this will not be performant for larger arrays. You may need to use parallel computation, e.g. via the 
-<a href="https://docs.python.org/3/library/concurrent.futures.html"><code>concurrent.futures</code></a> module in the Python standard library or <a href="https://docs.dask.org/en/stable/"><code>dask</code></a>.</p>
 <h2 id="details">Details<a class="headerlink" href="#details" title="Permanent link">#</a></h2>
 <h3 id="inferring-transform-metadata-from-explicit-coordinates">Inferring transform metadata from explicit coordinates<a class="headerlink" href="#inferring-transform-metadata-from-explicit-coordinates" title="Permanent link">#</a></h3>
 <p>OME-NGFF models an image as if each sample corresponds to an element from a finite, regular, N-dimensional grid. In this model, which is common in bioimaging, each axis of the that grid is parametrized by 3 numbers: </p>
@@ -932,7 +924,7 @@ problem by defining lightweight classes that have a single method, <code>wrap</c
 and returns something array-like. Functions in this library that use Zarr arrays to create <code>xarray.DataArray</code> objects take an <code>array_wrap</code> parameter that must be an instance of such a class (or a dict representation of such a class).</p>
 <p>This library includes two such "array wrappers" -- one that passes
 the input Zarr array through unaltered (<a href="api/array_wrap/#xarray_ome_ngff.array_wrap.ZarrArrayWrapper"><code>ZarrArrayWrapper</code></a>),
-and a more interesting array wrapper that wraps a Zarr array in a <a href="https://docs.dask.org/en/stable/array.html"><code>dask.array.Array</code></a> (<a href="api/array_wrap/#xarray_ome_ngff.array_wrap.DaskArrayWrapper">'DaskArrayWrapper</a>). The array wrappers are designed to be easy to implement; if the included wrappers are insufficient for an application, you should implement one that works for you.</p>
+and a more interesting array wrapper that wraps a Zarr array in a <a href="https://docs.dask.org/en/stable/array.html"><code>dask.array.Array</code></a> (<a href="api/array_wrap/#xarray_ome_ngff.array_wrap.DaskArrayWrapper">'DaskArrayWrapper`</a>). The array wrappers are designed to be easy to implement; if the included wrappers are insufficient for an application, you should implement one that works for you.</p>
 
 
 
