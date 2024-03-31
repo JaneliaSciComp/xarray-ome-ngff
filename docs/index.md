@@ -213,23 +213,11 @@ print(tuple(group.arrays()))
 (('s0', <zarr.core.Array '/my_group/s0' (10, 10) uint8>), ('s1', <zarr.core.Array '/my_group/s1' (5, 5) uint8>))
 """
 # write data to the arrays
+# this will not work if your arrays are large!
 for path, array in arrays.items():
   group[path][:] = array.data
 
 ```
-
-Note: the above example only wrote Zarr array and group metadata, and modified Zarr group attributes.
-It did not write any of the array data, but this is presumably the point of the whole endeavor. This 
-library does not provide any tools for writing data to Zarr arrays. For small arrays, the following
-code should work:
-
-```python
-for path, array in arrays.items():
-  group[path][:] = array.data
-```
-
-But this will not be performant for larger arrays. You may need to use parallel computation, e.g. via the 
-[`concurrent.futures`](https://docs.python.org/3/library/concurrent.futures.html) module in the Python standard library or [`dask`](https://docs.dask.org/en/stable/).
 
 # Details
 
@@ -262,4 +250,4 @@ and returns something array-like. Functions in this library that use Zarr arrays
 
 This library includes two such "array wrappers" -- one that passes
 the input Zarr array through unaltered ([`ZarrArrayWrapper`](./api/array_wrap.md#xarray_ome_ngff.array_wrap.ZarrArrayWrapper)),
-and a more interesting array wrapper that wraps a Zarr array in a [`dask.array.Array`](https://docs.dask.org/en/stable/array.html) (['DaskArrayWrapper](./api/array_wrap.md#xarray_ome_ngff.array_wrap.DaskArrayWrapper)). The array wrappers are designed to be easy to implement; if the included wrappers are insufficient for an application, you should implement one that works for you.
+and a more interesting array wrapper that wraps a Zarr array in a [`dask.array.Array`](https://docs.dask.org/en/stable/array.html) (['DaskArrayWrapper`](./api/array_wrap.md#xarray_ome_ngff.array_wrap.DaskArrayWrapper)). The array wrappers are designed to be easy to implement; if the included wrappers are insufficient for an application, you should implement one that works for you.
