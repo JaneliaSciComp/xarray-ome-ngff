@@ -9,7 +9,7 @@ being useless by tracking where, and how, our images were acquired. This context
 
 The [OME-NGFF](https://ngff.openmicroscopy.org/) project defines a very nice [Zarr](https://zarr.readthedocs.io/en/stable/)-based file 
 format for storing images and spatial metadata, i.e. useful context about where the images
-were acquired. `Xarray` defines a solid data model and python API for rasterized data with annotated coordinates. This package provides OME-NGFF and Xarray by providing tools for reading and writing OME-NGFF images using Xarray data structures.
+were acquired. `Xarray` defines a solid data model and python API for rasterized data with annotated coordinates. This package bridges OME-NGFF and Xarray by providing tools for reading and writing OME-NGFF images using Xarray data structures.
 
 # Examples
 
