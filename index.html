@@ -349,6 +349,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#extent-of-ome-ngff-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      Extent of OME-NGFF support
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -671,6 +680,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#extent-of-ome-ngff-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      Extent of OME-NGFF support
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -699,15 +717,11 @@
 <h2 id="xarray-ome-ngff"><code>xarray-ome-ngff</code><a class="headerlink" href="#xarray-ome-ngff" title="Permanent link">#</a></h2>
 <p>Integrating <a href="https://docs.xarray.dev/en/stable/">Xarray</a> with <a href="https://ngff.openmicroscopy.org/">OME-NGFF</a>.</p>
 <h2 id="motivation">Motivation<a class="headerlink" href="#motivation" title="Permanent link">#</a></h2>
-<p>Measurements without context are useless. In imaging applications, we try to prevent our images from 
+<p>Measurements without context are useless. In imaging applications we prevent our images from 
 being useless by tracking where, and how, our images were acquired. This context makes images interpretable, which makes those images potentially useful. </p>
-<p>The <a href="https://ngff.openmicroscopy.org/">OME-NGFF</a> project defines a <a href="https://zarr.readthedocs.io/en/stable/">Zarr</a>-based file 
+<p>The <a href="https://ngff.openmicroscopy.org/">OME-NGFF</a> project defines a very nice <a href="https://zarr.readthedocs.io/en/stable/">Zarr</a>-based file 
 format for storing images and spatial metadata, i.e. useful context about where the images
-were acquired. OME-NGFF, a format, composes naturally with <a href="https://docs.xarray.dev/en/stable/"><code>Xarray</code></a>, a python package, because <code>Xarray</code> defines a solid model and API for rasterized data with annotated coordinates. In particular, the Xarray model is <em>strictly broader</em> than the OME-NGFF image model: Xarray can 
-express things that OME-NGFF cannot, while OME-NGFF cannot express anything that Xarray cannot. So
-Xarray is a good fit for modelling data stored in OME-NGFF. </p>
-<p>All that's needed is an interface layer
-to generate Xarray datastructures from OME-NGFF data -- e.g., this package.</p>
+were acquired. <code>Xarray</code> defines a solid data model and python API for rasterized data with annotated coordinates. This package provides OME-NGFF and Xarray by providing tools for reading and writing OME-NGFF images using Xarray data structures.</p>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">#</a></h2>
 <h3 id="read-an-ome-ngff-zarr-group-as-a-dict-of-xarraydataarray">Read an OME-NGFF Zarr group as a dict of <code>xarray.DataArray</code><a class="headerlink" href="#read-an-ome-ngff-zarr-group-as-a-dict-of-xarraydataarray" title="Permanent link">#</a></h3>
 <p>This example accesses a public OME-NGFF multiscale image, which is stored in a Zarr group that 
@@ -925,6 +939,9 @@ and returns something array-like. Functions in this library that use Zarr arrays
 <p>This library includes two such "array wrappers" -- one that passes
 the input Zarr array through unaltered (<a href="api/array_wrap/#xarray_ome_ngff.array_wrap.ZarrArrayWrapper"><code>ZarrArrayWrapper</code></a>),
 and a more interesting array wrapper that wraps a Zarr array in a <a href="https://docs.dask.org/en/stable/array.html"><code>dask.array.Array</code></a> (<a href="api/array_wrap/#xarray_ome_ngff.array_wrap.DaskArrayWrapper">'DaskArrayWrapper`</a>). The array wrappers are designed to be easy to implement; if the included wrappers are insufficient for an application, you should implement one that works for you.</p>
+<h3 id="extent-of-ome-ngff-support">Extent of OME-NGFF support<a class="headerlink" href="#extent-of-ome-ngff-support" title="Permanent link">#</a></h3>
+<p>Only the <a href="https://ngff.openmicroscopy.org/latest/#multiscale-md">image pyramid specification</a> is supported by this package. Do you want more extensive OME-NGFF support in this library? 
+Open an issue on the <a href="https://github.com/JaneliaSciComp/xarray-ome-ngff">issue tracker</a></p>
 
 
 
@@ -975,7 +992,7 @@ and a more interesting array wrapper that wraps a Zarr array in a <a href="https
     </div>
     
     
-    <script id="__config" type="application/json">{"base": ".", "features": ["navigation.expand"], "search": "assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": ".", "features": ["navigation.expand", "content.code.annotate"], "search": "assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
       <script src="assets/javascripts/bundle.bd41221c.min.js"></script>
