@@ -10,10 +10,11 @@ repo_url: https://github.com/janeliascicomp/xarray-ome-ngff
 
 # Copyright
 copyright: Copyright &copy; 2016 - 2024 HHMI / Janelia
-
+watch: [src]
 theme:
   features:
     - navigation.expand
+    - content.code.annotate
   name: material
   palette: 
   # Palette toggle for light mode

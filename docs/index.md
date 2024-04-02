@@ -4,17 +4,12 @@ Integrating [Xarray](https://docs.xarray.dev/en/stable/) with [OME-NGFF](https:/
 
 # Motivation
 
-Measurements without context are useless. In imaging applications, we try to prevent our images from 
+Measurements without context are useless. In imaging applications we prevent our images from 
 being useless by tracking where, and how, our images were acquired. This context makes images interpretable, which makes those images potentially useful. 
 
-The [OME-NGFF](https://ngff.openmicroscopy.org/) project defines a [Zarr](https://zarr.readthedocs.io/en/stable/)-based file 
+The [OME-NGFF](https://ngff.openmicroscopy.org/) project defines a very nice [Zarr](https://zarr.readthedocs.io/en/stable/)-based file 
 format for storing images and spatial metadata, i.e. useful context about where the images
-were acquired. OME-NGFF, a format, composes naturally with [`Xarray`](https://docs.xarray.dev/en/stable/), a python package, because `Xarray` defines a solid model and API for rasterized data with annotated coordinates. In particular, the Xarray model is _strictly broader_ than the OME-NGFF image model: Xarray can 
-express things that OME-NGFF cannot, while OME-NGFF cannot express anything that Xarray cannot. So
-Xarray is a good fit for modelling data stored in OME-NGFF. 
-
-All that's needed is an interface layer
-to generate Xarray datastructures from OME-NGFF data -- e.g., this package.
+were acquired. `Xarray` defines a solid data model and python API for rasterized data with annotated coordinates. This package provides OME-NGFF and Xarray by providing tools for reading and writing OME-NGFF images using Xarray data structures.
 
 # Examples
 
@@ -64,7 +59,7 @@ Coordinates:
 
 Note this code from the above example:
 
-```python
+```{.python .test="skip"}
 array_wrapper = DaskArrayWrapper(chunks=10)
 arrays = read_multiscale_group(group, array_wrapper=array_wrapper)
 ```
@@ -251,3 +246,8 @@ and returns something array-like. Functions in this library that use Zarr arrays
 This library includes two such "array wrappers" -- one that passes
 the input Zarr array through unaltered ([`ZarrArrayWrapper`](./api/array_wrap.md#xarray_ome_ngff.array_wrap.ZarrArrayWrapper)),
 and a more interesting array wrapper that wraps a Zarr array in a [`dask.array.Array`](https://docs.dask.org/en/stable/array.html) (['DaskArrayWrapper`](./api/array_wrap.md#xarray_ome_ngff.array_wrap.DaskArrayWrapper)). The array wrappers are designed to be easy to implement; if the included wrappers are insufficient for an application, you should implement one that works for you.
+
+## Extent of OME-NGFF support
+
+Only the [image pyramid specification](https://ngff.openmicroscopy.org/latest/#multiscale-md) is supported by this package. Do you want more extensive OME-NGFF support in this library? 
+Open an issue on the [issue tracker](https://github.com/JaneliaSciComp/xarray-ome-ngff)
