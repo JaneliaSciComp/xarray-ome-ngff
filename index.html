@@ -721,7 +721,7 @@
 being useless by tracking where, and how, our images were acquired. This context makes images interpretable, which makes those images potentially useful. </p>
 <p>The <a href="https://ngff.openmicroscopy.org/">OME-NGFF</a> project defines a very nice <a href="https://zarr.readthedocs.io/en/stable/">Zarr</a>-based file 
 format for storing images and spatial metadata, i.e. useful context about where the images
-were acquired. <code>Xarray</code> defines a solid data model and python API for rasterized data with annotated coordinates. This package provides OME-NGFF and Xarray by providing tools for reading and writing OME-NGFF images using Xarray data structures.</p>
+were acquired. <code>Xarray</code> defines a solid data model and python API for rasterized data with annotated coordinates. This package bridges OME-NGFF and Xarray by providing tools for reading and writing OME-NGFF images using Xarray data structures.</p>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">#</a></h2>
 <h3 id="read-an-ome-ngff-zarr-group-as-a-dict-of-xarraydataarray">Read an OME-NGFF Zarr group as a dict of <code>xarray.DataArray</code><a class="headerlink" href="#read-an-ome-ngff-zarr-group-as-a-dict-of-xarraydataarray" title="Permanent link">#</a></h3>
 <p>This example accesses a public OME-NGFF multiscale image, which is stored in a Zarr group that 
