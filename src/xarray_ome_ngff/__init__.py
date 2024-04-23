@@ -120,7 +120,7 @@ def create_multiscale_group(
     arrays: dict[str, DataArray],
     transform_precision: int | None = None,
     ngff_version: Literal["0.4"] = "0.4",
-):
+) -> MultiscaleGroupV04:
     """
     store: zarr.storage.BaseStore
         The storage backend for the Zarr hierarchy.

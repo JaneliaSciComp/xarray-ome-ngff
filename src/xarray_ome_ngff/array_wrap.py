@@ -7,21 +7,21 @@ if TYPE_CHECKING:
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from importlib.util import find_spec
+from dask.array.core import Array as DaskArray
 import numpy as np
 import zarr
 
 
 @runtime_checkable
 class Arrayish(Protocol):
-    dtype: np.dtype
+    dtype: np.dtype[Any]
     shape: tuple[int, ...]
 
-    def __getitem__(self, *args) -> Self: ...
+    def __getitem__(self, *args: Any) -> Self: ...
 
 
 class ArrayWrapperSpec(TypedDict):
-    name: Literal["dask"]
+    name: str
     config: dict[str, Any]
 
 
@@ -31,18 +31,22 @@ class DaskArrayWrapperConfig(TypedDict):
     """
 
     chunks: str | int | tuple[int, ...] | tuple[tuple[int, ...], ...]
-    meta: Any = None
+    meta: Any
     inline_array: bool
 
 
 class ZarrArrayWrapperSpec(ArrayWrapperSpec):
-    name: Literal["zarr_array"]
-    config: dict[str, Any] = {}
+    # type checkers hate that the base class defines `name` to be mutable, but this is immutable.
+    # this will be fixed with python allows declaring typeddict fields as read-only.
+    name: Literal["zarr_array"]  # type: ignore
+    config: dict[str, Any]  # type: ignore
 
 
 class DaskArrayWrapperSpec(ArrayWrapperSpec):
-    name: Literal["dask_array"]
-    config: DaskArrayWrapperConfig
+    # type checkers hate that the base class defines `name` to be mutable, but this is immutable.
+    # this will be fixed with python allows declaring typeddict fields as read-only.
+    name: Literal["dask_array"]  # type: ignore
+    config: DaskArrayWrapperConfig  # type: ignore
 
 
 class BaseArrayWrapper(ABC):
@@ -56,7 +60,7 @@ class ZarrArrayWrapper(BaseArrayWrapper):
     An array wrapper that passes a `zarr.Array` instances through unchanged.
     """
 
-    def wrap(self, data: zarr.Array) -> Arrayish:
+    def wrap(self, data: zarr.Array) -> zarr.Array:  # type: ignore
         return data
 
 
@@ -83,20 +87,7 @@ class DaskArrayWrapper(BaseArrayWrapper):
     meta: Any = None
     inline_array: bool = True
 
-    def __post_init__(self) -> None:
-        """
-        Handle the lack of `dask`.
-        """
-        if find_spec("dask") is None:
-            msg = (
-                "Failed to import `dask` successfully. "
-                "The `dask` library is required to use `DaskArrayWrapper`."
-                "Install `dask` into your python environment, e.g. via "
-                "`pip install dask`, to resolve this issue."
-            )
-            ImportError(msg)
-
-    def wrap(self, data: zarr.Array):
+    def wrap(self, data: zarr.Array) -> DaskArray:  # type: ignore
         """
         Wrap the input in a dask array.
         """
@@ -107,27 +98,29 @@ class DaskArrayWrapper(BaseArrayWrapper):
         )
 
 
-def resolve_wrapper(spec: ArrayWrapperSpec) -> BaseArrayWrapper:
+def resolve_wrapper(spec: ArrayWrapperSpec) -> ZarrArrayWrapper | DaskArrayWrapper:
     """
     Convert an `ArrayWrapperSpec` into the corresponding `BaseArrayWrapper` subclass.
     """
     if spec["name"] == "dask_array":
-        spec = cast(DaskArrayWrapperConfig, spec)
+        spec = cast(DaskArrayWrapperSpec, spec)  # type: ignore
         return DaskArrayWrapper(**spec["config"])
     elif spec["name"] == "zarr_array":
-        spec = cast(ZarrArrayWrapperSpec, spec)
+        spec = cast(ZarrArrayWrapperSpec, spec)  # type: ignore
         return ZarrArrayWrapper(**spec["config"])
     else:
         raise ValueError(f"Spec {spec} is not recognized.")
 
 
-def parse_wrapper(data: ArrayWrapperSpec | BaseArrayWrapper):
+def parse_wrapper(
+    data: ArrayWrapperSpec | DaskArrayWrapper | ZarrArrayWrapper,
+) -> DaskArrayWrapper | ZarrArrayWrapper:
     """
     Parse the input into a `BaseArrayWrapper` subclass.
 
     If the input is already `BaseArrayWrapper`, it is returned as-is.
     Otherwise, the input is presumed to be `ArrayWrapperSpec` and is passed to `resolve_wrapper`.
     """
-    if isinstance(data, BaseArrayWrapper):
+    if isinstance(data, (ZarrArrayWrapper, DaskArrayWrapper)):
         return data
     return resolve_wrapper(data)

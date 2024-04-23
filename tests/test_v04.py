@@ -193,7 +193,7 @@ def test_create_coords():
         VectorTranslation(translation=(1, 2)),
     ]
 
-    coords = coords_from_transforms(axes, transforms, shape)
+    coords = coords_from_transforms(axes=axes, transforms=transforms, shape=shape)
     assert coords[0].equals(
         DataArray(
             np.array([1.0, 2.0, 3.0]),
