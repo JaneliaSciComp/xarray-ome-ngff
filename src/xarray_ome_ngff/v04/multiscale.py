@@ -175,14 +175,12 @@ def transforms_from_coords(
             unit_dimensionality = ureg.get_dimensionality(units)
             if len(unit_dimensionality) > 1:
                 msg = (
-                    f'Failed to infer the type of axis with unit = "{units}"',
+                    f'Failed to infer the type of axis with unit = "{units}"'
                     f'because it appears that unit "{units}" is a compound unit, '
                     'which cannot be mapped to a single axis type. "type" will be '
-                    'set to "None" for this axis.',
+                    'set to "None" for this axis.'
                 )
-                warnings.warn(
-                    RuntimeWarning,
-                )
+                warnings.warn(msg, category=RuntimeWarning)
             if "[length]" in unit_dimensionality:
                 type = "space"
             elif "[time]" in unit_dimensionality:
