@@ -1,5 +1,4 @@
 from pydantic import BaseModel
-from typing import Union, Dict, List, Optional
 
 import pint
 
@@ -11,8 +10,8 @@ class CoordinateAttrs(BaseModel):
     A model of the attributes of a DataArray coordinate
     """
 
-    units: Optional[str]
+    units: str | None
 
 
-JSON = Union[Dict[str, "JSON"], List["JSON"], str, int, float, bool, None]
+JSON = dict[str, "JSON"] | list["JSON"] | str | int | float | bool | None
 NGFF_VERSIONS = ("0.4",)
