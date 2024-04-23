@@ -378,7 +378,7 @@ def create_group(
     arrays: dict[str, DataArray],
     transform_precision: int | None = None,
     chunks: tuple[int, ...] | tuple[tuple[int, ...]] | Literal["auto"] = "auto",
-    compressor: Codec = Zstd(3),
+    compressor: Codec | None = Zstd(3),
     fill_value: Any = 0,
 ) -> zarr.Group:
     """
