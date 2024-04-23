@@ -1,4 +1,6 @@
+from __future__ import annotations
 from pydantic import BaseModel
+from typing import Union
 
 import pint
 
@@ -13,5 +15,5 @@ class CoordinateAttrs(BaseModel):
     units: str | None
 
 
-JSON = dict[str, "JSON"] | list["JSON"] | str | int | float | bool | None
+JSON = Union[dict[str, "JSON"], list["JSON"], str, int, float, bool, None]
 NGFF_VERSIONS = ("0.4",)
