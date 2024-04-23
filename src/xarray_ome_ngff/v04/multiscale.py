@@ -338,12 +338,13 @@ def model_group(
             )
         )
     )
-    # requires a fix upstream to make models hashable
-    # if len(set(axeses)) != 1:
-    #    raise ValueError(
-    #        f"Got {len(set(axeses))} unique axes from `arrays`",
-    #        "which suggests means that their dimensions and / or coordinates are incompatible.",
-    #    )
+
+    if len(set(axeses)) != 1:
+        msg = (
+            f"Got {len(set(axeses))} unique axes from `arrays` "
+            "which means that their dimensions and / or coordinates are incompatible."
+        )
+        raise ValueError(msg)
 
     group = Group.from_arrays(
         arrays=arrays.values(),

@@ -142,6 +142,7 @@ def pyramid(request) -> tuple[DataArray, DataArray, DataArray]:
 )
 def test_make_pyramid(pyramid: tuple[DataArray, DataArray, DataArray]):
     assert len(pyramid) == 3
+    assert all(isinstance(x, DataArray) for x in pyramid)
 
 
 @pytest.mark.parametrize(
@@ -170,10 +171,10 @@ def test_multiscale_metadata(pyramid: tuple[DataArray, DataArray, DataArray]):
 
     expected_meta = MultiscaleMetadata(
         name="foo",
-        datasets=[
+        datasets=tuple(
             Dataset(path=array_paths[idx], coordinateTransformations=transforms[idx])
             for idx, m in enumerate(pyramid)
-        ],
+        ),
         axes=axes[0],
     ).model_dump()
 
@@ -188,8 +189,8 @@ def test_create_coords():
     ]
 
     transforms = [
-        VectorScale(scale=[1, 0.5]),
-        VectorTranslation(translation=[1, 2]),
+        VectorScale(scale=(1, 0.5)),
+        VectorTranslation(translation=(1, 2)),
     ]
 
     coords = coords_from_transforms(axes, transforms, shape)
@@ -208,6 +209,73 @@ def test_create_coords():
             attrs={"units": "kilometer"},
         )
     )
+
+
+@pytest.mark.parametrize(
+    "pyramid",
+    [
+        PyramidRequest(
+            shape=(16,) * 3,
+            scale=(1.0, 1.2, 0.5),
+            translate=(0.0, 1.1, 0.0),
+            dims=("z", "y", "x"),
+        ),
+    ],
+    indirect=["pyramid"],
+)
+def test_axes_consistent_dims(pyramid: tuple[DataArray, DataArray, DataArray]):
+    """
+    Test that creating a multiscale group from a collection of DataArray with inconsistent
+    dimensions raises an exception.
+    """
+
+    # mutate the first array so that it has different dimensions from the rest
+    p0 = pyramid[0]
+    new_dims = tuple(str(k) + "_x" for k in p0.coords)
+    pyramid_mutated = (
+        DataArray(p0.data, dims=new_dims, coords=tuple(p0.coords.values())),
+        *pyramid[1:],
+    )
+    assert pyramid_mutated[0].dims != p0.dims
+    msg = (
+        "Got 2 unique axes from `arrays` which means that their dimensions "
+        "and / or coordinates are incompatible."
+    )
+    with pytest.raises(ValueError, match=msg):
+        model_group(arrays=dict(zip(("s0", "s1", "s2"), pyramid_mutated)))
+
+
+@pytest.mark.parametrize(
+    "pyramid",
+    [
+        PyramidRequest(
+            shape=(16,) * 3,
+            scale=(1.0, 1.2, 0.5),
+            translate=(0.0, 1.1, 0.0),
+            dims=("z", "y", "x"),
+            units=("meter", "meter", "meter"),
+        ),
+    ],
+    indirect=["pyramid"],
+)
+def test_axes_consistent_units(pyramid: tuple[DataArray, DataArray, DataArray]):
+    """
+    Test that creating a multiscale group from a collection of DataArray with inconsistent
+    units raises an exception.
+    """
+
+    # mutate the first array so that it has different units from the rest
+    old_coords = tuple(pyramid[0].coords.items())
+    for key, value in old_coords:
+        value.attrs["units"] = "second"
+        pyramid[0].coords[key] = value
+
+    msg = (
+        "Got 2 unique axes from `arrays` which means that their dimensions "
+        "and / or coordinates are incompatible."
+    )
+    with pytest.raises(ValueError, match=msg):
+        model_group(arrays=dict(zip(("s0", "s1", "s2"), pyramid)))
 
 
 @pytest.mark.parametrize("normalize_units", [True, False])
@@ -312,8 +380,8 @@ def test_read_create_group(
     arrays = dict(zip(paths, pyramid))
     axes, transforms = tuple(zip(*(transforms_from_coords(m.coords) for m in pyramid)))
     expected_group_model = Group.from_arrays(
-        arrays=arrays.values(),
-        paths=arrays.keys(),
+        arrays=tuple(arrays.values()),
+        paths=tuple(arrays.keys()),
         axes=axes[0],
         scales=[t[0].scale for t in transforms],
         translations=[t[1].translation for t in transforms],
