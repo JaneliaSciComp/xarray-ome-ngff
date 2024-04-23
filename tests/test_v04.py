@@ -22,6 +22,7 @@ from xarray_ome_ngff.v04.multiscale import (
     coords_from_transforms,
 )
 from zarr.storage import FSStore, BaseStore
+from numcodecs import Zstd
 from pydantic_ome_ngff.v04.axis import Axis
 from pydantic_ome_ngff.v04.multiscale import MultiscaleMetadata, Dataset, Group
 from pydantic_ome_ngff.v04.transform import (
@@ -280,7 +281,7 @@ def test_axes_consistent_units(pyramid: tuple[DataArray, DataArray, DataArray]):
 
 @pytest.mark.parametrize("normalize_units", [True, False])
 @pytest.mark.parametrize("infer_axis_type", [True, False])
-def test_create_axes_transforms(normalize_units: bool, infer_axis_type: bool):
+def test_create_axes_transforms(normalize_units: bool, infer_axis_type: bool) -> None:
     """
     Test that `Axis` and `coordinateTransformations` objects can be created from
     `DataArray` coordinates.
@@ -360,6 +361,9 @@ def test_create_axes_transforms(normalize_units: bool, infer_axis_type: bool):
         ),
     ),
 )
+@pytest.mark.parametrize("chunks", ("auto", 10))
+@pytest.mark.parametrize("compressor", (None, Zstd(3)))
+@pytest.mark.parametrize("fill_value", (0, 1))
 def test_read_create_group(
     store: BaseStore,
     paths: tuple[str, str, str],
@@ -370,6 +374,9 @@ def test_read_create_group(
         | DaskArrayWrapperSpec
         | ZarrArrayWrapperSpec
     ),
+    chunks: int | Literal["auto"],
+    compressor: None | Zstd,
+    fill_value: Literal[0, 1],
 ) -> None:
 
     # write some values to the arrays
@@ -379,15 +386,25 @@ def test_read_create_group(
 
     arrays = dict(zip(paths, pyramid))
     axes, transforms = tuple(zip(*(transforms_from_coords(m.coords) for m in pyramid)))
+    if isinstance(chunks, int):
+        _chunks = (chunks,) * pyramid[0].ndim
+    else:
+        _chunks = chunks
+
     expected_group_model = Group.from_arrays(
         arrays=tuple(arrays.values()),
         paths=tuple(arrays.keys()),
         axes=axes[0],
         scales=[t[0].scale for t in transforms],
         translations=[t[1].translation for t in transforms],
+        chunks=_chunks,
+        compressor=compressor,
+        fill_value=fill_value,
     )
 
-    observed_group_model = model_group(arrays=arrays)
+    observed_group_model = model_group(
+        arrays=arrays, chunks=_chunks, fill_value=fill_value, compressor=compressor
+    )
 
     assert observed_group_model == expected_group_model
 
@@ -463,7 +480,7 @@ def test_multiscale_to_array(
         | DaskArrayWrapperSpec
         | ZarrArrayWrapperSpec
     ),
-):
+) -> None:
 
     # write some values to the arrays
     pyramid[0][:] = 1

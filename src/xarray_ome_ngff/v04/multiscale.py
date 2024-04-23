@@ -1,6 +1,6 @@
 from __future__ import annotations
 from pydantic_ome_ngff.v04.multiscale import Group as MultiscaleGroup
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from xarray_ome_ngff.array_wrap import ArrayWrapperSpec, DaskArrayWrapper
 from xarray_ome_ngff.array_wrap import ZarrArrayWrapper
@@ -21,6 +21,8 @@ import warnings
 from xarray_ome_ngff.core import CoordinateAttrs, ureg
 import zarr
 from zarr.storage import BaseStore
+from numcodecs.abc import Codec
+from numcodecs import Zstd
 
 import os
 
@@ -315,7 +317,12 @@ def normalize_transforms(
 
 
 def model_group(
-    *, arrays: dict[str, DataArray], transform_precision: int | None = None
+    *,
+    arrays: dict[str, DataArray],
+    transform_precision: int | None = None,
+    chunks: tuple[int, ...] | tuple[tuple[int, ...]] | Literal["auto"] = "auto",
+    compressor: Codec | None = Zstd(3),
+    fill_value: Any = 0,
 ) -> MultiscaleGroup:
     """
     Create a model of an OME-NGFF multiscale group from a dict of `xarray.DataArray`.
@@ -357,6 +364,9 @@ def model_group(
         axes=axeses[0],
         scales=[tx[0].scale for tx in transformses],
         translations=[tx[1].translation for tx in transformses],
+        chunks=chunks,
+        compressor=compressor,
+        fill_value=fill_value,
     )
     return group
 
@@ -367,7 +377,10 @@ def create_group(
     path: str,
     arrays: dict[str, DataArray],
     transform_precision: int | None = None,
-) -> MultiscaleGroup:
+    chunks: tuple[int, ...] | tuple[tuple[int, ...]] | Literal["auto"] = "auto",
+    compressor: Codec = Zstd(3),
+    fill_value: Any = 0,
+) -> zarr.Group:
     """
     Create Zarr group that complies with 0.4 of the OME-NGFF multiscale specification from a dict
     of `xarray.DataArray`.
@@ -386,7 +399,13 @@ def create_group(
 
     """
 
-    model = model_group(arrays=arrays, transform_precision=transform_precision)
+    model = model_group(
+        arrays=arrays,
+        transform_precision=transform_precision,
+        chunks=chunks,
+        compressor=compressor,
+        fill_value=fill_value,
+    )
     return model.to_zarr(store, path)
 
 
