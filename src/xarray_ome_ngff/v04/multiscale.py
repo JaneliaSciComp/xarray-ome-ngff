@@ -1,30 +1,37 @@
 from __future__ import annotations
-from pydantic_ome_ngff.v04.multiscale import Group as MultiscaleGroup
+
 from typing import TYPE_CHECKING, Literal
 
-from xarray_ome_ngff.array_wrap import ArrayWrapperSpec, DaskArrayWrapper
-from xarray_ome_ngff.array_wrap import ZarrArrayWrapper
-from xarray_ome_ngff.array_wrap import parse_wrapper
+from pydantic_ome_ngff.v04.multiscale import Group as MultiscaleGroup
+
+from xarray_ome_ngff.array_wrap import (
+    ArrayWrapperSpec,
+    DaskArrayWrapper,
+    ZarrArrayWrapper,
+    parse_wrapper,
+)
+from xarray_ome_ngff.core import get_parent
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Sequence
 
+import os
+import warnings
+
 import numpy as np
-from xarray import DataArray
+import zarr
+from numcodecs import Zstd
+from numcodecs.abc import Codec
 from pydantic_ome_ngff.v04.axis import Axis
 from pydantic_ome_ngff.v04.multiscale import Dataset, MultiscaleMetadata
 from pydantic_ome_ngff.v04.transform import (
     VectorScale,
     VectorTranslation,
 )
-import warnings
-from xarray_ome_ngff.core import CoordinateAttrs, ureg
-import zarr
+from xarray import DataArray
 from zarr.storage import BaseStore
-from numcodecs.abc import Codec
-from numcodecs import Zstd
 
-import os
+from xarray_ome_ngff.core import CoordinateAttrs, ureg
 
 
 def multiscale_metadata(
@@ -280,7 +287,6 @@ def normalize_transforms(
     ),
     dset_transforms: tuple[VectorScale] | tuple[VectorScale, VectorTranslation],
 ) -> tuple[VectorScale, VectorTranslation]:
-
     if base_transforms is None or len(base_transforms) == 0:
         out_scale = dset_transforms[0]
         if len(dset_transforms) == 1:
@@ -463,22 +469,6 @@ def read_group(
         result[dset.path] = arr_out
 
     return result
-
-
-def get_parent(node: zarr.Group | zarr.Array) -> zarr.Group:
-    """
-    Get the parent node of a Zarr array or group
-    """
-    if hasattr(node.store, "path"):
-        store_path = node.store.path
-        if node.path == "":
-            new_full_path, new_node_path = os.path.split(os.path.split(store_path)[0])
-        else:
-            full_path, _ = os.path.split(os.path.join(store_path, node.path))
-            new_full_path, new_node_path = os.path.split(full_path)
-        return zarr.open_group(type(node.store)(new_full_path), path=new_node_path)
-    else:
-        return zarr.open_group(store=node.store, path=os.path.split(node.path)[0])
 
 
 def read_array(

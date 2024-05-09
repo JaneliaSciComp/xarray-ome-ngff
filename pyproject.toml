@@ -53,3 +53,8 @@ warn_required_dynamic_aliases = true
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+lint.select = [
+    "I",  # isort formatting.
+]
