@@ -57,7 +57,7 @@ class BaseArrayWrapper(ABC):
 @dataclass
 class ZarrArrayWrapper(BaseArrayWrapper):
     """
-    An array wrapper that passes a `zarr.Array` instances through unchanged.
+    An array wrapper that passes `zarr.Array` instances through unchanged.
     """
 
     def wrap(self, data: zarr.Array) -> zarr.Array:  # type: ignore
