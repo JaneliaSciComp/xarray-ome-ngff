@@ -10,7 +10,11 @@ import numpy as np
 import pytest
 from pydantic_zarr.v2 import ArraySpec, GroupSpec
 from zarr import DirectoryStore, MemoryStore, open_array, open_group
+from zarr.storage import FSStore
 from zarr.errors import GroupNotFoundError
+
+import os
+from itertools import accumulate
 
 
 @pytest.mark.parametrize("node_type", ("array", "group"))
@@ -33,7 +37,7 @@ def test_ascend_once(
     tree_flat["/node/subnode"] = subnode
     hierarchy = GroupSpec.from_flat(tree_flat).to_zarr(store, path="/")
 
-    assert get_parent(hierarchy["node/subnode"]).attrs["target"] == True
+    assert get_parent(hierarchy["node/subnode"]).attrs["target"]
 
 
 @pytest.mark.parametrize("node_type", ("array", "group"))
@@ -52,15 +56,11 @@ def test_get_parent_root_node(
         get_parent(hierarchy)
 
 
-import os
-from itertools import accumulate
-
-
 @pytest.mark.parametrize("start_depth", (1, 2, 3))
 @pytest.mark.parametrize(
-    "store", ("directory_store", "memory_store"), indirect=("store",)
+    "store", ("directory_store", "memory_store", "fsstore_local"), indirect=("store",)
 )
-def test_iter_parents(start_depth: int, store: MemoryStore | DirectoryStore):
+def test_iter_parents(start_depth: int, store: MemoryStore | DirectoryStore | FSStore):
     tree_flat = {}
     for key in accumulate(
         map(str, range(1, start_depth)), lambda a, b: os.path.join(a, b), initial="/0"

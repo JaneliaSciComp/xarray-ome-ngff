@@ -16,16 +16,16 @@ authors = [
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: Implementation :: CPython",
 ]
 dependencies = [
+  "zarr<3.0.0",
   "xarray >= 2023.2.0",
   "pydantic-ome-ngff >= 0.5.0",
-  "pint >= 0.20.1",
+  "pint >= 0.24",
   "pydantic >= 2.0.0, <3",
   "dask >= 2022.3.0"
 ]
@@ -38,15 +38,18 @@ Source = "https://github.com/U.N. Owen/xarray-ome-ngff"
 [tool.hatch.version]
 path = "src/xarray_ome_ngff/__about__.py"
 
-[tool.hatch.env.test]
+[tool.hatch.envs.test]
 dependencies = [
   "pytest == 7.2.1",
   "pytest-cov",
   "s3fs",
-  "pytest-examples >= 0.0.9"]
+  "pytest-examples >= 0.0.9",
+  "requests",
+  "aiohttp",
+  ]
 
 [[tool.hatch.envs.test.matrix]]
-python = ["3.9", "3.10", "3.11"]
+python = ["3.10", "3.11"]
 
 [tool.hatch.envs.test.scripts]
 run-coverage = "pytest --cov-config=pyproject.toml --cov=pkg --cov=tests"
