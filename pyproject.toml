@@ -31,9 +31,9 @@ dependencies = [
 ]
 
 [project.urls]
-Documentation = "https://github.com/U.N. Owen/xarray-ome-ngff#readme"
-Issues = "https://github.com/U.N. Owen/xarray-ome-ngff/issues"
-Source = "https://github.com/U.N. Owen/xarray-ome-ngff"
+Documentation = "https://janeliascicomp.github.io/xarray-ome-ngff"
+Issues = "https://github.com/janeliascicomp/xarray-ome-ngff/issues"
+Source = "https://github.com/janeliascicomp/xarray-ome-ngff"
 
 [tool.hatch.version]
 path = "src/xarray_ome_ngff/__about__.py"
