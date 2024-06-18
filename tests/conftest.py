@@ -1,5 +1,5 @@
 import pytest
-from zarr.storage import DirectoryStore, MemoryStore
+from zarr.storage import DirectoryStore, MemoryStore, FSStore
 
 
 @pytest.fixture(scope="function")
@@ -8,5 +8,6 @@ def store(request, tmpdir):
         return MemoryStore()
     elif request.param == "directory_store":
         return DirectoryStore(str(tmpdir))
-    else:
-        assert False
+    elif request.param == "fsstore_local":
+        return FSStore(str(tmpdir))
+    raise AssertionError
