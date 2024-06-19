@@ -535,7 +535,7 @@ def read_array(
                         )
                         arr_wrapped = wrapper.wrap(array)
                         return DataArray(arr_wrapped, coords=coords)
-        except ValueError:
+        except KeyError:
             parent = get_parent(parent)
     raise FileNotFoundError(
         f"Could not find version 0.4 OME-NGFF multiscale metadata in any Zarr groups in the "

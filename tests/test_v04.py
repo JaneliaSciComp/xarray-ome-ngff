@@ -380,7 +380,6 @@ def test_read_create_group(
     compressor: None | Zstd,
     fill_value: Literal[0, 1],
 ) -> None:
-
     # write some values to the arrays
     pyramid[0][:] = 1
     pyramid[1][:] = 2
@@ -483,7 +482,6 @@ def test_multiscale_to_array(
         | ZarrArrayWrapperSpec
     ),
 ) -> None:
-
     # write some values to the arrays
     pyramid[0][:] = 1
     pyramid[1][:] = 2
